@@ -29,6 +29,8 @@ servicio), JWT, Docker Compose.
 - **Código en inglés**: identificadores, clases, métodos, variables, paquetes, endpoints, nombres
   de eventos/colas/exchanges, tablas y columnas.
 - **Documentación y comentarios en español**: specs, planes, README, comentarios y Javadoc.
+- **Mensajes de commit en inglés**, con formato Conventional Commits (`feat:`, `fix:`, `docs:`,
+  `test:`, `chore:`, `refactor:`).
 
 ## Flujo de trabajo (SDD + superpowers)
 Fases: 0 repo · 1 diseño global · 2 contratos · 3 infraestructura · 4 Inventario ·
