@@ -30,7 +30,8 @@ servicio), JWT, Docker Compose.
   de eventos/colas/exchanges, tablas y columnas.
 - **Documentación y comentarios en español**: specs, planes, README, comentarios y Javadoc.
 - **Mensajes de commit en inglés**, con formato Conventional Commits (`feat:`, `fix:`, `docs:`,
-  `test:`, `chore:`, `refactor:`).
+  `test:`, `chore:`, `refactor:`). Breves y puntuales: una línea de resumen y, solo si aporta,
+  un cuerpo corto. Se permite incluir la línea `Co-Authored-By` de Claude.
 
 ## Flujo de trabajo (SDD + superpowers)
 Fases: 0 repo · 1 diseño global · 2 contratos · 3 infraestructura · 4 Inventario ·
