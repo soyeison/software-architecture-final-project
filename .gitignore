@@ -1,0 +1,26 @@
+# Material de referencia del curso (no versionado)
+Arquitectura de Software - Entrega.pdf
+Captura desde 2026-10-09 17-05-52.png
+Entrega previa 1 - Arquitectura de Software (1).pdf
+
+# Java / Maven
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Entorno local
+.env
