@@ -3,6 +3,9 @@ Arquitectura de Software - Entrega.pdf
 Captura desde 2026-10-09 17-05-52.png
 Entrega previa 1 - Arquitectura de Software (1).pdf
 
+# Documentos de trabajo locales
+docs/plan-de-trabajo.md
+
 # Java / Maven
 target/
 *.class
