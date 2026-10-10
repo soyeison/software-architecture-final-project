@@ -142,11 +142,27 @@ módulo compartido. Cada servicio tiene su propia clase del evento; el contrato 
 | 10 | Seguridad | Sin token o token inválido: `401`. Token sin permiso de venta: `403`. |
 | 11 | Latencia | `updatedAt − occurredAt`, visible en la consulta y en los logs. |
 
-### 4.3 Errores transitorios en el Catálogo
+### 4.3 Manejo de errores en el consumidor del Catálogo
 
-Si falla un recurso del Catálogo (por ejemplo, su base de datos), el mensaje se reintenta un
-número acotado de veces con espera entre intentos. Si sigue fallando, va a la DLQ. Nunca se
-reencola en un bucle infinito.
+El consumidor clasifica cada fallo según su causa, porque reintentar solo tiene sentido cuando
+el problema es la infraestructura y no el mensaje:
+
+| Tipo | Ejemplos | Comportamiento |
+|---|---|---|
+| **Permanente** (el mensaje es el problema) | JSON corrupto, campo faltante o inválido, SKU desconocido | Nack sin reencolar: el mensaje va a la DLQ de inmediato. |
+| **Transitorio** (la infraestructura es el problema) | Base de datos del Catálogo caída, timeout | Reintento sin límite con espera creciente (1 s, 2 s, 4 s… hasta un tope de ~30 s). El mensaje nunca va a la DLQ por esta causa. |
+
+Mientras un mensaje transitorio se reintenta no se confirma, de modo que la cola queda en pausa
+y los eventos siguientes esperan detrás de él, conservando el orden. Una caída prolongada de la
+base de datos del Catálogo se comporta igual que el escenario 5: los eventos se acumulan en la
+cola y el Catálogo converge cuando el recurso vuelve. Este comportamiento se implementa, pero no
+forma parte de los escenarios de prueba ni de la demo.
+
+**Reprocesamiento de la DLQ (no se construye).** En un entorno real, los mensajes de la DLQ se
+inspeccionan, se corrige la causa (por ejemplo, un bug del consumidor o un producto no sembrado)
+y se devuelven a la cola principal con un script manual. Reprocesar es seguro gracias a la
+idempotencia por `eventId` y al descarte de versiones viejas. En este proyecto solo se menciona
+en el documento como práctica operativa recomendada.
 
 ### 4.4 Consistencia
 
@@ -237,6 +253,8 @@ El reparto de bloques entre integrantes lo decide el equipo.
 | Modo por lotes reproducible en el Catálogo | El equipo prefirió una medición más simple; el "antes" se explica. |
 | Publicación inmediata tras el commit con outbox como respaldo | Optimización innecesaria para la latencia objetivo (YAGNI). |
 | Módulo compartido con la clase del evento | Acoplaría los servicios; el contrato se comparte como documento y schema. |
+| Script de reprocesamiento de la DLQ | Con la clasificación de errores, la DLQ solo recibe fallos permanentes; no aporta a ningún escenario. Se menciona como práctica para un entorno real. |
+| Escenario de prueba "BD del Catálogo caída" | El comportamiento se implementa (sección 4.3), pero no se prueba ni se muestra; su efecto es equivalente al escenario 5. |
 
 ## 9. Siguientes fases
 
