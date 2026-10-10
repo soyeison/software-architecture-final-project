@@ -78,7 +78,7 @@ Los servicios se coordinan por **coreografía** mediante eventos; no hay orquest
 
 ### 3.4 Evento "Cambio de Inventario"
 
-Campos: `eventId`, `sku`, `newStock` (valor **absoluto**), `version`, `channel` y
+Campos: `eventId`, `sku`, `newStock` (valor **absoluto**), `stockVersion`, `channel` y
 `occurredAt`. El esquema definitivo (JSON Schema y ejemplo) se fija en la fase 2 y vive en
 `docs/contracts/`.
 
@@ -123,7 +123,7 @@ módulo compartido. Cada servicio tiene su propia clase del evento; el contrato 
 3. El publicador del outbox envía el evento a RabbitMQ y lo marca como enviado tras la
    confirmación del broker.
 4. El Catálogo, en una transacción, comprueba que el `eventId` no se haya procesado, aplica el
-   stock absoluto si la versión es mayor que la guardada y registra el `eventId`. Luego hace ack.
+   stock absoluto si el `stockVersion` es mayor que la guardada y registra el `eventId`. Luego hace ack.
 5. La consulta del producto en el Catálogo muestra el nuevo stock, `updatedAt` y la latencia.
 
 ### 4.2 Escenarios
@@ -138,7 +138,7 @@ módulo compartido. Cada servicio tiene su propia clase del evento; el contrato 
 | 6 | Mensaje duplicado | El `eventId` ya registrado se reconoce: ack sin cambios. |
 | 7 | Mensaje inválido | Falla la deserialización o la validación: nack sin reencolar y el mensaje termina en la DLQ sin bloquear la cola. |
 | 8 | RabbitMQ caído | La venta se confirma (`201`) y el evento queda pendiente en `outbox`. Cuando RabbitMQ vuelve, el publicador lo envía. Cero eventos perdidos. |
-| 9 | Eventos fuera de orden | Un evento con versión menor o igual a la guardada se ignora con ack. El estado final es correcto porque el stock es absoluto. |
+| 9 | Eventos fuera de orden | Un evento con `stockVersion` menor o igual a la guardada se ignora con ack. El estado final es correcto porque el stock es absoluto. |
 | 10 | Seguridad | Sin token o token inválido: `401`. Token sin permiso de venta: `403`. |
 | 11 | Latencia | `updatedAt − occurredAt`, visible en la consulta y en los logs. |
 
