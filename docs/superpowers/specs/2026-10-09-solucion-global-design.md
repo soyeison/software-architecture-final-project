@@ -78,9 +78,15 @@ Los servicios se coordinan por **coreografía** mediante eventos; no hay orquest
 
 ### 3.4 Evento "Cambio de Inventario"
 
-Campos mínimos: `eventId`, `sku`, stock anterior, stock nuevo (valor **absoluto**), versión,
-`channel` y `occurredAt`. El esquema definitivo (JSON Schema y ejemplo) se fija en la fase 2 y
-vive en `docs/contracts/`.
+Campos: `eventId`, `sku`, `newStock` (valor **absoluto**), `version`, `channel` y
+`occurredAt`. El esquema definitivo (JSON Schema y ejemplo) se fija en la fase 2 y vive en
+`docs/contracts/`.
+
+El evento transporta el estado resultante (*Event-Carried State Transfer*), no un delta: aplicar
+el mismo evento dos veces o recibir uno viejo después de uno nuevo no altera el resultado, y el
+último evento basta para que el Catálogo quede correcto. No se incluye el stock anterior porque
+ningún consumidor lo necesita; para logs legibles ("5 → 4"), el Catálogo usa su propio valor
+previo.
 
 ### 3.5 Datos de partida
 
