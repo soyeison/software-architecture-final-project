@@ -36,6 +36,9 @@ servicio), JWT, Docker Compose.
 ## Convenciones
 - **Código en inglés**: identificadores, clases, métodos, variables, paquetes, endpoints, nombres
   de eventos/colas/exchanges, tablas y columnas.
+- **Nombres completos, sin abreviaturas**: `sequence_number`, `attempts`, `quantity`, `index`.
+  Solo se admiten siglas del dominio o de estándares conocidos (`SKU`, `JWT`, `UUID`, `DTO`,
+  `HTTP`, `JSON`, `DLQ`) y las unidades estándar (`ms`).
 - **Documentación y comentarios en español**: specs, planes, README, comentarios y Javadoc.
 - **Mensajes de commit en inglés**, con formato Conventional Commits (`feat:`, `fix:`, `docs:`,
   `test:`, `chore:`, `refactor:`). Breves y puntuales: una línea de resumen y, solo si aporta,
