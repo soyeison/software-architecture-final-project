@@ -32,6 +32,10 @@ servicio), JWT, Docker Compose.
 - `scripts/verify-contracts.sh` verifica los contratos; `scripts/verify-infra.sh` verifica la
   infraestructura (ambos requieren Docker; `verify-infra.sh` también necesita curl y jq).
 - Datos semilla de referencia: `docs/seed-data.md`.
+- `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
+  integración). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
+- Tras cambiar el código de un servicio, `docker compose up -d --wait --build`: sin `--build`,
+  Compose reutiliza la imagen anterior.
 
 ## Convenciones
 - **Código en inglés**: identificadores, clases, métodos, variables, paquetes, endpoints, nombres
