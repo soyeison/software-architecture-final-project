@@ -6,6 +6,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 REDOCLY_IMAGE="redocly/cli:2.62.1"
 FILES=(
   "inventory-service.yaml"
+  "catalog-service.yaml"
 )
 
 status=0

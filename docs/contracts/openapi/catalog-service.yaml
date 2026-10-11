@@ -1,0 +1,161 @@
+openapi: 3.1.0
+info:
+  title: Catalog Service API
+  version: 1.0.0
+  description: |
+    Servicio de Catálogo: datos de producto y vista de disponibilidad de solo lectura para los
+    canales digitales. La disponibilidad se actualiza exclusivamente con los eventos
+    `InventoryStockChanged`; este servicio nunca consulta al Servicio de Inventario.
+servers:
+  - url: http://localhost:8082
+    description: Entorno local (Docker Compose)
+security: []
+tags:
+  - name: Products
+    description: Consulta de productos y disponibilidad
+paths:
+  /api/v1/catalog/products:
+    get:
+      tags: [Products]
+      operationId: listProducts
+      summary: Listar productos con su disponibilidad
+      description: Devuelve todos los productos, sin paginación ni filtros.
+      responses:
+        '200':
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+              example:
+                - sku: TENIS-RUNNER-42
+                  name: Tenis Runner talla 42
+                  description: Tenis para correr, malla transpirable
+                  price: 289900
+                  currency: COP
+                  availableStock: 4
+                  inStock: true
+                  updatedAt: '2026-10-10T15:04:05.512Z'
+                  lastEventLatencyMs: 389
+                - sku: CAMISETA-DRYFIT-M
+                  name: Camiseta Dry-Fit talla M
+                  description: Camiseta deportiva de secado rápido
+                  price: 79900
+                  currency: COP
+                  availableStock: 0
+                  inStock: false
+                  updatedAt: '2026-10-10T14:00:00.000Z'
+                  lastEventLatencyMs: null
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/catalog/products/{sku}:
+    get:
+      tags: [Products]
+      operationId: getProduct
+      summary: Consultar un producto
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          description: Código del producto
+          schema:
+            type: string
+            pattern: '^[A-Z0-9][A-Z0-9-]*$'
+          example: TENIS-RUNNER-42
+      responses:
+        '200':
+          description: Producto con su disponibilidad
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+              example:
+                sku: TENIS-RUNNER-42
+                name: Tenis Runner talla 42
+                description: Tenis para correr, malla transpirable
+                price: 289900
+                currency: COP
+                availableStock: 4
+                inStock: true
+                updatedAt: '2026-10-10T15:04:05.512Z'
+                lastEventLatencyMs: 389
+        '404':
+          description: SKU inexistente
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: https://api.retail-demo.local/problems/not-found
+                title: Not found
+                status: 404
+                detail: SKU UNKNOWN-SKU does not exist
+                instance: /api/v1/catalog/products/UNKNOWN-SKU
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  schemas:
+    Product:
+      type: object
+      required: [sku, name, description, price, currency, availableStock, inStock, updatedAt, lastEventLatencyMs]
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: integer
+          minimum: 0
+          description: Precio en pesos colombianos, sin decimales
+        currency:
+          type: string
+          const: COP
+        availableStock:
+          type: integer
+          minimum: 0
+        inStock:
+          type: boolean
+          description: '`true` si `availableStock` > 0'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Momento en que el Catálogo aplicó el último cambio (o el sembrado inicial)
+        lastEventLatencyMs:
+          type: [integer, 'null']
+          minimum: 0
+          description: |
+            `updatedAt` − `occurredAt` del último evento aplicado, en milisegundos.
+            `null` si el producto no ha recibido eventos.
+    Problem:
+      type: object
+      description: Detalle de error según RFC 9457
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  responses:
+    InternalError:
+      description: Error interno (sin detalles de implementación)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.retail-demo.local/problems/internal-error
+            title: Internal error
+            status: 500
+            detail: An unexpected error occurred
+            instance: /api/v1/catalog/products
