@@ -26,7 +26,7 @@ check() { # check <descripción> <valor obtenido> <valor esperado>
 
 compose_defaults() { # compose resuelto con un archivo de entorno dado y sin variables heredadas
   env -u RABBITMQ_AMQP_PORT -u RABBITMQ_MGMT_PORT -u INVENTORY_DB_PORT -u CATALOG_DB_PORT \
-      -u INVENTORY_DB_PASSWORD -u CATALOG_DB_PASSWORD \
+      -u INVENTORY_DB_PASSWORD -u CATALOG_DB_PASSWORD -u INVENTORY_SERVICE_PORT -u JWT_SECRET \
       docker compose --env-file "$1" config
 }
 
@@ -39,7 +39,7 @@ else
 fi
 
 echo "== 2. Arranque y puertos =="
-if up_output="$(docker compose up -d --wait --wait-timeout 180 2>&1)"; then
+if up_output="$(docker compose up -d --wait --wait-timeout 180 rabbitmq inventory-db catalog-db 2>&1)"; then
   echo "PASS: los tres servicios llegan a healthy"
 else
   echo "FAIL: los servicios no llegaron a healthy"; echo "$up_output"; docker compose ps; exit 1
@@ -130,7 +130,7 @@ check "la fila sigue tras stop/start" "$(wait_for_value 30 1 inventory_sql -c 's
 
 echo "== 8. down + up reinicia el estado =="
 docker compose down -v >/dev/null 2>&1
-docker compose up -d --wait --wait-timeout 180 >/dev/null 2>&1
+docker compose up -d --wait --wait-timeout 180 rabbitmq inventory-db catalog-db >/dev/null 2>&1
 check "la tabla de prueba ya no existe" "$(inventory_sql -c "select coalesce(to_regclass('verify_probe')::text, 'none')" 2>/dev/null)" "none"
 check "la cola quedó vacía" "$(wait_for_value 20 0 queue_messages)" "0"
 

@@ -15,6 +15,7 @@ docs/seed-data.md         Datos semilla compartidos por los servicios y los E2E
 docs/superpowers/specs/   Especificaciones de diseño
 docs/superpowers/plans/   Planes de implementación
 infra/rabbitmq/           Topología y configuración de RabbitMQ
+inventory-service/        Servicio de Inventario (Spring Boot)
 scripts/                  Scripts de verificación y utilidades
 ```
 
@@ -23,11 +24,11 @@ scripts/                  Scripts de verificación y utilidades
 Requiere Docker con Compose.
 
 ```bash
-docker compose up -d --wait   # levanta RabbitMQ y las dos bases de datos
+docker compose up -d --wait --build   # levanta la infraestructura y los servicios, reconstruyendo sus imágenes (la primera construcción requiere internet y tarda unos minutos)
 docker compose down -v        # borra contenedores, redes y volúmenes: reinicia el estado de la demo
 ```
 
-Para levantar solo la infraestructura (cuando los servicios ya estén en el Compose):
+Para levantar solo la infraestructura:
 `docker compose up -d --wait rabbitmq inventory-db catalog-db`.
 
 | Componente | Desde el host | Desde otro contenedor | Credenciales de demo |
@@ -36,6 +37,7 @@ Para levantar solo la infraestructura (cuando los servicios ya estén en el Comp
 | Consola de RabbitMQ | http://localhost:15672 | — | `retail` / `retail-demo` |
 | Base de Inventario | `localhost:5441` | `inventory-db:5432` | `inventory` / `inventory-demo`, base `inventory` |
 | Base de Catálogo | `localhost:5442` | `catalog-db:5432` | `catalog` / `catalog-demo`, base `catalog` |
+| Servicio de Inventario | http://localhost:8081 (Swagger UI en `/swagger-ui/index.html`) | `inventory-service:8081` | JWT (desde la sub-tarea 4.2) |
 
 Son credenciales de **demo, no aptas para producción**. Los puertos se publican solo en
 `127.0.0.1`.
@@ -62,6 +64,21 @@ Datos semilla: [docs/seed-data.md](docs/seed-data.md).
   siguiente `up`.
 - **Un solo stack por equipo:** el proyecto de Compose se llama `retail`, de modo que solo puede
   correr uno a la vez (un segundo checkout o worktree recrearía los contenedores del primero).
+
+## Servicio de Inventario
+
+Código en `inventory-service/` (Java 25, Spring Boot 4, Maven wrapper). Diseño en la
+[spec de Inventario](docs/superpowers/specs/2026-10-11-inventario-design.md).
+
+```bash
+cd inventory-service
+./mvnw test     # pruebas unitarias y de arquitectura (rápidas)
+./mvnw verify   # además, las pruebas de integración (*IntegrationTest)
+```
+
+Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su contenedor
+(`docker compose stop inventory-service`) y definir `JWT_SECRET` con al menos 32 bytes, por ejemplo
+el valor de `.env.example`. Sin `JWT_SECRET` válido el servicio no arranca, a propósito.
 
 ## Verificación
 

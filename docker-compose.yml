@@ -55,6 +55,30 @@ services:
     networks:
       - catalog-net
 
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    environment:
+      SERVER_PORT: "8081"
+      JWT_SECRET: ${JWT_SECRET:-retail-demo-jwt-secret-not-for-production-use}
+    ports:
+      - "127.0.0.1:${INVENTORY_SERVICE_PORT:-8081}:8081"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    networks:
+      - messaging
+      - inventory-net
+
 networks:
   messaging:
   inventory-net:
