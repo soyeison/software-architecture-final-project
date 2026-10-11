@@ -46,4 +46,20 @@ public final class TestTokens {
         }
         return token.serialize();
     }
+
+    /** Token firmado correctamente pero sin claim {@code exp}: no debe aceptarse nunca. */
+    public static String signWithoutExpiration(String secret, String issuer, String scope) {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(issuer)
+                .subject("test-client")
+                .claim("scope", scope)
+                .build();
+        SignedJWT token = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        try {
+            token.sign(new MACSigner(secret.getBytes(StandardCharsets.UTF_8)));
+        } catch (JOSEException exception) {
+            throw new IllegalStateException("Could not sign test token", exception);
+        }
+        return token.serialize();
+    }
 }

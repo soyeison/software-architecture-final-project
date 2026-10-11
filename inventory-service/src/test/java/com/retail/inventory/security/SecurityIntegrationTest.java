@@ -214,4 +214,11 @@ class SecurityIntegrationTest {
     private static String bearer(String token) {
         return "Bearer " + token;
     }
+
+    @Test
+    void tokenWithoutExpirationIsUnauthorized() throws Exception {
+        String token = TestTokens.signWithoutExpiration(TestTokens.SECRET, TestTokens.ISSUER, "inventory:sell");
+
+        mockMvc.perform(sale(token)).andExpect(status().isUnauthorized());
+    }
 }

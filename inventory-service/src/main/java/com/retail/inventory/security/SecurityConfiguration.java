@@ -12,6 +12,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -60,7 +62,11 @@ public class SecurityConfiguration {
         SecretKeySpec key = new SecretKeySpec(
                 properties.jwt().secret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(properties.jwt().issuer()));
+        // La expiración es obligatoria: por defecto Spring acepta tokens sin claim exp, y un token así no caducaría nunca.
+        JwtTimestampValidator timestamps = new JwtTimestampValidator();
+        timestamps.setAllowEmptyExpiryClaim(false);
+        decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
+                new JwtIssuerValidator(properties.jwt().issuer()), timestamps));
         return decoder;
     }
 }
