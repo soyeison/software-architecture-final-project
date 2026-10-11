@@ -149,11 +149,19 @@ truncan a milisegundos para cumplir el contrato.
 | `POST /api/v1/inventory/{sku}/sales` | `SCOPE_inventory:sell` |
 | `GET /api/v1/inventory/outbox` | pública (diagnóstico de la demo) |
 | `GET /api/v1/inventory/{sku}` | `SCOPE_inventory:read` |
-| `/actuator/health`, Swagger UI y el YAML del contrato | públicas |
-| cualquier otra | denegada |
+| `/actuator/health`, Swagger UI, su configuración (`/v3/api-docs/swagger-config`) y el YAML del contrato | públicas |
+| `/error` (ruta interna de Spring para errores del contenedor) | pública |
+| cualquier otra, incluido `/v3/api-docs` | denegada |
 
 La regla de `outbox` va **antes** que la de `{sku}`; si no, exigiría el scope de lectura. Se fija con
 una prueba.
+
+- **`/v3/api-docs` se deniega a propósito.** Es el OpenAPI que springdoc genera desde el código; no se
+  puede apagar sin apagar Swagger UI, y publicaría un segundo contrato distinto del escrito a mano.
+  Swagger UI sigue funcionando con su configuración y el YAML del contrato.
+- **Una ruta inexistente responde 401 (sin token) o 403 (con token), no 404.** Es la consecuencia de
+  denegar por defecto y es intencional: no se revela qué rutas existen. Un SKU inexistente en una ruta
+  válida sigue respondiendo 404.
 
 ### Respuestas 401 y 403
 
@@ -177,6 +185,9 @@ respuesta 401 del OpenAPI en esta sub-tarea (cambio compatible del contrato).
   y emisor incorrecto → 401; `outbox` público.
 - En 4.2 aún no hay endpoints reales: se usa un controlador de prueba solo en `src/test` con las
   mismas rutas. Las sub-tareas 4.3 y 4.4 lo eliminan y mueven esas pruebas a los endpoints reales.
+- Las pruebas del manejador de errores (de 4.1) desactivan los filtros de seguridad
+  (`addFilters = false`): prueban solo el manejo de errores, y la seguridad se prueba aparte con su
+  propia matriz.
 
 ## 6. Stock y datos (sub-tarea 4.3)
 
@@ -382,9 +393,25 @@ recursos del classpath y funcionan desde cualquier directorio.
 | **4.6** | Relay, `GET /outbox` y publicación | RabbitMQ real, incluida su caída | 8 |
 
 **Dependencias por sub-tarea:** cada una agrega solo las que necesita (4.1: web, validación, actuator,
-ArchUnit y pruebas; 4.2: seguridad y Resource Server; 4.3: Data JPA, Flyway, PostgreSQL y Testcontainers;
-4.5: el validador de JSON Schema; 4.6: AMQP y el módulo de RabbitMQ de Testcontainers). Los nombres
+springdoc, ArchUnit, el validador de JSON Schema y pruebas; 4.2: seguridad y Resource Server; 4.3: Data
+JPA, Flyway, PostgreSQL y Testcontainers; 4.6: AMQP y el módulo de RabbitMQ de Testcontainers). El
+validador de JSON Schema llega en 4.1 porque el ayudante de contrato lo usa desde entonces. Los nombres
 exactos de los starters de Spring Boot 4 se confirman en cada plan.
+
+### Pendientes heredados de la revisión de 4.1
+
+Hallazgos de la revisión final de 4.1 que no correspondían a esa sub-tarea. Cada uno tiene una
+sub-tarea responsable y su plan debe incluirlo.
+
+| Pendiente | Sub-tarea |
+|---|---|
+| Las excepciones estándar de Spring MVC (parámetro faltante, tipo incorrecto, `HandlerMethodValidationException`) responden `type: about:blank`; deben responder `validation-error` con `errors`, y la prueba del 405 debe validar el schema `Problem` | 4.3 |
+| Retirar `allowEmptyShould(true)` de la regla 3 (controladores sin repositorios) de ArchUnit | 4.3 |
+| Retirar `allowEmptyShould(true)` de la regla 4 (`stock/` y `sale/` independientes de web y mensajería) | 4.4 |
+| `validation-error` con `message` nulo o con violaciones de clase (no solo de campo) | 4.4 |
+| El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
+| El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
+| Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |
 
 ### Cierre de la fase 4
 
