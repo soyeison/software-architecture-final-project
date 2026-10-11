@@ -17,8 +17,15 @@ sub-tarea (sección 9), cada uno ejecutado con SDD.
 
 ### Fuera de alcance (YAGNI)
 
-Métricas y trazas, límite de peticiones, paginación, servidor de autenticación, varios relays del
-outbox en paralelo (`SKIP LOCKED`) y purga del outbox.
+Observabilidad avanzada (Micrometer, Prometheus, trazado distribuido con OpenTelemetry, paneles),
+límite de peticiones, paginación, servidor de autenticación, varios relays del outbox en paralelo
+(`SKIP LOCKED`) y purga del outbox.
+
+La observabilidad básica **sí está incluida**: logs con `sku` y `eventId` (sección 4),
+`/actuator/health` y el diagnóstico del outbox (`GET /outbox`). La métrica del documento final, la
+latencia de propagación, no depende de métricas del servicio: Inventario pone `occurredAt` en el
+evento, el Catálogo calcula `updatedAt − occurredAt` (campo `lastEventLatencyMs` y logs) y
+`e2e/measure-latency.sh` (fase 6) la resume.
 
 ## 2. Principios de diseño
 
