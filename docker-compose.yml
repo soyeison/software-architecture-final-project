@@ -1,0 +1,61 @@
+# Infraestructura del sistema: RabbitMQ y una base PostgreSQL por servicio.
+# Credenciales de DEMO: no aptas para producción. Los servicios (fases 4 y 5) se agregan a este archivo.
+name: retail
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    ports:
+      - "127.0.0.1:${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      # La opción z es necesaria en Fedora (SELinux); en otros sistemas no tiene efecto.
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro,z
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-definitions.conf:ro,z
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 10s
+    networks:
+      - messaging
+
+  inventory-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory-demo}
+    ports:
+      - "127.0.0.1:${INVENTORY_DB_PORT:-5441}:5432"
+    healthcheck:
+      # -h 127.0.0.1: durante la inicialización PostgreSQL solo escucha en el socket unix;
+      # sin -h, pg_isready respondería "listo" antes de tiempo.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "inventory", "-d", "inventory"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks:
+      - inventory-net
+
+  catalog-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog-demo}
+    ports:
+      - "127.0.0.1:${CATALOG_DB_PORT:-5442}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "catalog", "-d", "catalog"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks:
+      - catalog-net
+
+networks:
+  messaging:
+  inventory-net:
+  catalog-net:
