@@ -25,6 +25,13 @@ servicio), JWT, Docker Compose.
 - Los servicios se coordinan por coreografía (eventos), no hay orquestador central.
 - Consumidores idempotentes (deduplicación por `eventId`), colas durables, ack manual y DLQ.
 
+## Comandos
+- `docker compose up -d --wait` levanta RabbitMQ y las bases de datos; `docker compose down` las
+  detiene y borra los datos (reinicia el estado de la demo).
+- `scripts/verify-contracts.sh` verifica los contratos; `scripts/verify-infra.sh` verifica la
+  infraestructura (ambos requieren Docker).
+- Datos semilla de referencia: `docs/seed-data.md`.
+
 ## Convenciones
 - **Código en inglés**: identificadores, clases, métodos, variables, paquetes, endpoints, nombres
   de eventos/colas/exchanges, tablas y columnas.
