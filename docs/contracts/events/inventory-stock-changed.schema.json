@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://api.retail-demo.local/events/inventory-stock-changed.schema.json",
+  "title": "InventoryStockChanged",
+  "description": "Evento publicado por inventory-service cuando cambia el stock de un SKU. Transporta el stock absoluto resultante (Event-Carried State Transfer).",
+  "type": "object",
+  "required": ["eventId", "eventType", "sku", "newStock", "stockVersion", "channel", "occurredAt"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "description": "Identificador único del evento; igual al saleId de la venta. Base de la idempotencia del consumidor.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "description": "Tipo de evento.",
+      "const": "InventoryStockChanged"
+    },
+    "sku": {
+      "description": "Producto afectado.",
+      "type": "string",
+      "minLength": 1
+    },
+    "newStock": {
+      "description": "Stock absoluto resultante.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "stockVersion": {
+      "description": "Versión del stock tras el cambio; el consumidor descarta versiones menores o iguales a la ya aplicada.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "channel": {
+      "description": "Canal que originó el cambio.",
+      "enum": ["POS", "ONLINE"]
+    },
+    "occurredAt": {
+      "description": "Momento de la venta, ISO-8601 en UTC con milisegundos.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    }
+  }
+}

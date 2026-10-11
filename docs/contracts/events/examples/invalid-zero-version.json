@@ -1,0 +1,9 @@
+{
+  "eventId": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+  "eventType": "InventoryStockChanged",
+  "sku": "TENIS-RUNNER-42",
+  "newStock": 3,
+  "stockVersion": 0,
+  "channel": "ONLINE",
+  "occurredAt": "2026-10-10T15:07:00.000Z"
+}
