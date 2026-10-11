@@ -9,6 +9,7 @@ Catálogo), comunicados mediante RabbitMQ.
 ## Estructura
 ```
 docker-compose.yml        Infraestructura: RabbitMQ y una base PostgreSQL por servicio
+.env.example              Variables opcionales del Compose (copiar a .env)
 docs/contracts/           Contratos: OpenAPI, JSON Schema del evento (ver su README)
 docs/seed-data.md         Datos semilla compartidos por los servicios y los E2E
 docs/superpowers/specs/   Especificaciones de diseño
@@ -23,7 +24,7 @@ Requiere Docker con Compose.
 
 ```bash
 docker compose up -d --wait   # levanta RabbitMQ y las dos bases de datos
-docker compose down           # detiene todo y borra los datos: reinicia el estado de la demo
+docker compose down -v        # borra contenedores, redes y volúmenes: reinicia el estado de la demo
 ```
 
 Para levantar solo la infraestructura (cuando los servicios ya estén en el Compose):
@@ -40,7 +41,7 @@ Son credenciales de **demo, no aptas para producción**. Los puertos se publican
 `127.0.0.1`.
 
 Un servicio puede correr dentro de Compose (usa los nombres de la columna "Desde otro
-contenedor") o desde el IDE con `./mvnw spring-boot:run`, deteniendo antes su contenedor y usando
+contenedor") o desde el IDE (a partir de las fases 4 y 5) con `./mvnw spring-boot:run`, deteniendo antes su contenedor y usando
 los puertos de la columna "Desde el host". Las variables de entorno de cada servicio están en la
 [spec de infraestructura](docs/superpowers/specs/2026-10-10-infraestructura-design.md).
 
@@ -53,8 +54,14 @@ Datos semilla: [docs/seed-data.md](docs/seed-data.md).
   `infra/rabbitmq/definitions.json` como hash.
 - **SELinux (Fedora):** los montajes de RabbitMQ llevan la opción `z`. Sin ella, el broker arranca
   pero no carga la topología.
-- **`docker compose down` borra los datos.** Es el reinicio buscado para la demo; `stop` y `start`
-  sí los conservan.
+- **`docker compose down -v` borra los datos.** Es el reinicio buscado para la demo; `stop` y
+  `start` sí los conservan (el contenedor se mantiene). Un `down` sin `-v` deja volúmenes anónimos
+  huérfanos.
+- **Cambiar una contraseña de base de datos en `.env`:** PostgreSQL aplica la contraseña solo la
+  primera vez que crea la base, así que hay que ejecutar `docker compose down -v` antes del
+  siguiente `up`.
+- **Un solo stack por equipo:** el proyecto de Compose se llama `retail`, de modo que solo puede
+  correr uno a la vez (un segundo checkout o worktree recrearía los contenedores del primero).
 
 ## Verificación
 

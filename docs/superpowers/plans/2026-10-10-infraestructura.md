@@ -692,3 +692,12 @@ Expected: `Contratos: OK` y `31`.
 git add docs/seed-data.md README.md CLAUDE.md docs/superpowers/specs/2026-10-09-solucion-global-design.md
 git commit -m "docs: document infrastructure and shared seed data"
 ```
+
+## Nota posterior a la revisión final
+
+Tras la revisión final de la rama se aplicaron estos cambios sobre lo escrito arriba:
+
+- El reinicio de la demo es `docker compose down -v` (los volúmenes anónimos de PostgreSQL y RabbitMQ sobreviven a `down`). La sección 8 del script usa `down -v` y se agregó el check "el Compose no declara volúmenes con nombre" (32 comprobaciones en total).
+- La spec §5 define `SPRING_DATASOURCE_PASSWORD` con interpolación de `INVENTORY_DB_PASSWORD` / `CATALOG_DB_PASSWORD`.
+- Se agregó el SKU `CALCETINES-PACK-3` para los escenarios que inyectan eventos directamente.
+- El script verifica que existan `curl` y `jq` y usa `NET_PREFIX`; se agregó `.gitattributes`.

@@ -13,11 +13,15 @@ conjunto de SKU**. Diseño en la
 | `MOCHILA-TRAIL-20L` | Mochila Trail 20 L | 189 900 | 10 | Catálogo caído (varias ventas acumuladas) |
 | `BOTELLA-TERMICA-750` | Botella térmica 750 ml | 59 900 | 10 | RabbitMQ caído (outbox) |
 | `GORRA-SPORT-NEGRA` | Gorra Sport negra | 39 900 | 50 | Medición de latencia (20 ventas, con margen) |
+| `CALCETINES-PACK-3` | Calcetines deportivos pack x3 | 24 900 | 20 | Eventos inyectados directamente (duplicado y fuera de orden) |
 
 ## Reglas
 
 - Cada escenario usa **su propio SKU**, de modo que no se interfieren y pueden ensayarse en
-  cualquier orden. Para volver al estado inicial basta `docker compose down` y `docker compose up -d --wait`.
+  cualquier orden. Los escenarios que inyectan eventos directamente en RabbitMQ (duplicado y fuera
+  de orden) usan `CALCETINES-PACK-3`: para ese SKU el estado del Catálogo puede divergir del de
+  Inventario por diseño, así que ningún otro escenario debe usarlo. Para volver al estado inicial
+  basta `docker compose down -v` y `docker compose up -d --wait`.
 - **Inventario** siembra `version = 1` con el stock de la tabla.
 - **Catálogo** siembra la misma disponibilidad, su versión interna del stock en `0` (de modo que
   cualquier primer evento, con `stockVersion >= 1`, se aplique), `updatedAt` igual a la hora del

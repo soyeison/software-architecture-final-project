@@ -5,12 +5,15 @@ set -uo pipefail   # sin -e a propósito: se ejecutan todos los checks y se agre
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1
+command -v curl >/dev/null && command -v jq >/dev/null || { echo "FAIL: se requieren curl y jq en el equipo"; exit 1; }
 
 # Proyecto y puertos propios: no toca ni choca con un stack de desarrollo en marcha.
 export COMPOSE_PROJECT_NAME="retail-verify"
 export RABBITMQ_AMQP_PORT=35672 RABBITMQ_MGMT_PORT=35673 INVENTORY_DB_PORT=35441 CATALOG_DB_PORT=35442
 # Las variables del entorno tienen prioridad sobre el .env de quien desarrolla.
 export INVENTORY_DB_PASSWORD="inventory-demo" CATALOG_DB_PASSWORD="catalog-demo"
+# Prefijo de las redes de Compose (<proyecto>_<red>).
+NET_PREFIX="${COMPOSE_PROJECT_NAME}_"
 
 status=0
 
@@ -46,6 +49,8 @@ for target in "rabbitmq 5672" "rabbitmq 15672" "inventory-db 5432" "catalog-db 5
   published="$(docker compose port $target)"
   check "puerto ${target#* } de ${target% *} publicado solo en 127.0.0.1" "${published%%:*}" "127.0.0.1"
 done
+# down -v (reinicio de la demo) también borraría volúmenes con nombre: el Compose no debe tener ninguno.
+check "el Compose no declara volúmenes con nombre" "$(docker compose config --format json | jq '.volumes // {} | length')" "0"
 
 # Helpers de las secciones 3 a 5
 PG_IMAGE="postgres:17-alpine"
@@ -63,20 +68,20 @@ resolves() { # resolves <red> <nombre>: imprime resolves o unresolved
 }
 
 echo "== 3. Credenciales =="
-check "inventory acepta su usuario"        "$(pg_select_1 retail-verify_inventory-net inventory-db inventory inventory-demo inventory)" "1"
-check "catalog acepta su usuario"          "$(pg_select_1 retail-verify_catalog-net catalog-db catalog catalog-demo catalog)" "1"
-check "inventory rechaza una contraseña incorrecta" "$(pg_select_1 retail-verify_inventory-net inventory-db inventory incorrecta inventory)" "error"
-check "inventory rechaza al usuario de catalog" "$(pg_select_1 retail-verify_inventory-net inventory-db catalog catalog-demo inventory)" "error"
-check "catalog rechaza al usuario de inventory" "$(pg_select_1 retail-verify_catalog-net catalog-db inventory inventory-demo catalog)" "error"
+check "inventory acepta su usuario"        "$(pg_select_1 "${NET_PREFIX}inventory-net" inventory-db inventory inventory-demo inventory)" "1"
+check "catalog acepta su usuario"          "$(pg_select_1 "${NET_PREFIX}catalog-net" catalog-db catalog catalog-demo catalog)" "1"
+check "inventory rechaza una contraseña incorrecta" "$(pg_select_1 "${NET_PREFIX}inventory-net" inventory-db inventory incorrecta inventory)" "error"
+check "inventory rechaza al usuario de catalog" "$(pg_select_1 "${NET_PREFIX}inventory-net" inventory-db catalog catalog-demo inventory)" "error"
+check "catalog rechaza al usuario de inventory" "$(pg_select_1 "${NET_PREFIX}catalog-net" catalog-db inventory inventory-demo catalog)" "error"
 
 echo "== 4. Aislamiento de redes =="
-check "catalog-net resuelve catalog-db"      "$(resolves retail-verify_catalog-net catalog-db)" "resolves"
-check "catalog-net NO resuelve inventory-db" "$(resolves retail-verify_catalog-net inventory-db)" "unresolved"
-check "inventory-net resuelve inventory-db"  "$(resolves retail-verify_inventory-net inventory-db)" "resolves"
-check "inventory-net NO resuelve catalog-db" "$(resolves retail-verify_inventory-net catalog-db)" "unresolved"
-check "messaging resuelve rabbitmq"          "$(resolves retail-verify_messaging rabbitmq)" "resolves"
-check "messaging NO resuelve inventory-db"   "$(resolves retail-verify_messaging inventory-db)" "unresolved"
-check "messaging NO resuelve catalog-db"     "$(resolves retail-verify_messaging catalog-db)" "unresolved"
+check "catalog-net resuelve catalog-db"      "$(resolves "${NET_PREFIX}catalog-net" catalog-db)" "resolves"
+check "catalog-net NO resuelve inventory-db" "$(resolves "${NET_PREFIX}catalog-net" inventory-db)" "unresolved"
+check "inventory-net resuelve inventory-db"  "$(resolves "${NET_PREFIX}inventory-net" inventory-db)" "resolves"
+check "inventory-net NO resuelve catalog-db" "$(resolves "${NET_PREFIX}inventory-net" catalog-db)" "unresolved"
+check "messaging resuelve rabbitmq"          "$(resolves "${NET_PREFIX}messaging" rabbitmq)" "resolves"
+check "messaging NO resuelve inventory-db"   "$(resolves "${NET_PREFIX}messaging" inventory-db)" "unresolved"
+check "messaging NO resuelve catalog-db"     "$(resolves "${NET_PREFIX}messaging" catalog-db)" "unresolved"
 
 echo "== 5. Topología de RabbitMQ cargada =="
 check "la consola de RabbitMQ responde" \
@@ -124,7 +129,7 @@ docker compose up -d --wait --wait-timeout 120 inventory-db >/dev/null 2>&1
 check "la fila sigue tras stop/start" "$(wait_for_value 30 1 inventory_sql -c 'select count(*) from verify_probe')" "1"
 
 echo "== 8. down + up reinicia el estado =="
-docker compose down >/dev/null 2>&1
+docker compose down -v >/dev/null 2>&1
 docker compose up -d --wait --wait-timeout 180 >/dev/null 2>&1
 check "la tabla de prueba ya no existe" "$(inventory_sql -c "select coalesce(to_regclass('verify_probe')::text, 'none')" 2>/dev/null)" "none"
 check "la cola quedó vacía" "$(wait_for_value 20 0 queue_messages)" "0"
