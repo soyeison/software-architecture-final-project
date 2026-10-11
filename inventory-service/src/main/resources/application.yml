@@ -16,3 +16,13 @@ management:
     web:
       exposure:
         include: health
+
+# Swagger UI muestra el contrato escrito a mano (contrato primero), no el generado desde el código.
+springdoc:
+  swagger-ui:
+    url: /openapi/inventory-service.yaml
+
+logging:
+  pattern:
+    # Claves del MDC para seguir una venta de punta a punta.
+    level: "%5p [sku=%X{sku:-}] [eventId=%X{eventId:-}]"
