@@ -90,4 +90,43 @@ check "cola $QUEUE (durable)" \
 check "cola $QUEUE.dlq (durable)" \
   "$(rabbit_api "$RABBIT_API/queues/%2F/$QUEUE.dlq" | jq -r '.durable')" "true"
 
+# Helpers de las secciones 6 a 8
+queue_messages() { # mensajes de la cola, exacto e inmediato (la API HTTP actualiza sus estadísticas cada ~5 s)
+  docker compose exec -T rabbitmq rabbitmqctl -q list_queues name messages | awk -v q="$QUEUE" '$1 == q { print $2 }'
+}
+wait_for_value() { # wait_for_value <segundos> <esperado> <comando...>: imprime el último valor leído
+  local seconds="$1" expected="$2" value=""; shift 2
+  for _ in $(seq 1 "$seconds"); do
+    value="$("$@" 2>/dev/null)"
+    [[ "$value" == "$expected" ]] && break
+    sleep 1
+  done
+  echo "$value"
+}
+inventory_sql() { docker compose exec -T inventory-db psql -U inventory -d inventory -tAq "$@"; }
+
+echo "== 6. Un mensaje persistente sobrevive a stop/start de RabbitMQ =="
+check "se publica un mensaje persistente y se enruta" \
+  "$(rabbit_api -X POST "$RABBIT_API/exchanges/%2F/inventory.events/publish" \
+      -d '{"properties":{"delivery_mode":2},"routing_key":"inventory.stock.changed","payload":"{}","payload_encoding":"string"}' | jq -r .routed)" "true"
+check "el mensaje está en la cola antes de detener RabbitMQ" "$(wait_for_value 10 1 queue_messages)" "1"
+docker compose stop rabbitmq >/dev/null 2>&1
+docker compose start rabbitmq >/dev/null 2>&1
+docker compose up -d --wait --wait-timeout 120 rabbitmq >/dev/null 2>&1
+check "el mensaje sigue en la cola tras stop/start" "$(wait_for_value 30 1 queue_messages)" "1"
+
+echo "== 7. Una fila sobrevive a stop/start de la base =="
+inventory_sql -c 'create table verify_probe(id int); insert into verify_probe values (1);' >/dev/null 2>&1
+check "la fila existe antes de detener la base" "$(inventory_sql -c 'select count(*) from verify_probe' 2>/dev/null)" "1"
+docker compose stop inventory-db >/dev/null 2>&1
+docker compose start inventory-db >/dev/null 2>&1
+docker compose up -d --wait --wait-timeout 120 inventory-db >/dev/null 2>&1
+check "la fila sigue tras stop/start" "$(wait_for_value 30 1 inventory_sql -c 'select count(*) from verify_probe')" "1"
+
+echo "== 8. down + up reinicia el estado =="
+docker compose down >/dev/null 2>&1
+docker compose up -d --wait --wait-timeout 180 >/dev/null 2>&1
+check "la tabla de prueba ya no existe" "$(inventory_sql -c "select coalesce(to_regclass('verify_probe')::text, 'none')" 2>/dev/null)" "none"
+check "la cola quedó vacía" "$(wait_for_value 20 0 queue_messages)" "0"
+
 exit $status
