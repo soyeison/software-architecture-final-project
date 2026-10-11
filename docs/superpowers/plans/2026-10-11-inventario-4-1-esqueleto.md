@@ -1207,7 +1207,7 @@ Expected: `32` (incluye que `.env.example` coincide con los valores por defecto 
 Requiere los puertos 5672, 15672, 5441, 5442 y 8081 libres. Run:
 
 ```bash
-docker compose up -d --wait --wait-timeout 300; echo "up exit=$?"
+docker compose up -d --wait --wait-timeout 300 --build; echo "up exit=$?"
 docker compose ps --format '{{.Service}}:{{.Health}}'
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/actuator/health
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8081/swagger-ui/index.html
@@ -1216,7 +1216,7 @@ curl -s http://localhost:8081/openapi/inventory-service.yaml | grep -c 'title: I
 curl -s http://localhost:8081/does-not-exist | jq -r .type
 ```
 
-Expected: `up exit=0` (la primera vez construye la imagen, alrededor de un minuto); los cuatro servicios `healthy` (`catalog-db`, `inventory-db`, `inventory-service`, `rabbitmq`); `200`; `200`; `/openapi/inventory-service.yaml`; `1`; `https://api.retail-demo.local/problems/not-found`.
+Expected: `up exit=0` (construye la imagen; la primera vez tarda alrededor de un minuto, después usa la caché); los cuatro servicios `healthy` (`catalog-db`, `inventory-db`, `inventory-service`, `rabbitmq`); `200`; `200`; `/openapi/inventory-service.yaml`; `1`; `https://api.retail-demo.local/problems/not-found`.
 
 - [ ] **Step 7: Comprobar que el contenedor no arranca con un secreto corto**
 
@@ -1283,7 +1283,7 @@ docker compose up -d --wait   # levanta RabbitMQ y las dos bases de datos
 por:
 
 ```bash
-docker compose up -d --wait   # levanta la infraestructura y los servicios (la primera vez construye las imágenes)
+docker compose up -d --wait --build   # levanta la infraestructura y los servicios, reconstruyendo sus imágenes
 ```
 
 3. Reemplazar la frase `Para levantar solo la infraestructura (cuando los servicios ya estén en el Compose):` por `Para levantar solo la infraestructura:`.
@@ -1320,6 +1320,8 @@ En `CLAUDE.md`, sección `## Comandos`, agregar al final de la lista:
 ```markdown
 - `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
   integración). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
+- Tras cambiar el código de un servicio, `docker compose up -d --wait --build`: sin `--build`,
+  Compose reutiliza la imagen anterior.
 ```
 
 - [ ] **Step 3: Verificar enlaces y contenido**
@@ -1334,7 +1336,7 @@ test -f docs/superpowers/specs/2026-10-11-inventario-design.md && echo "enlace o
 grep -c 'cd inventory-service && ./mvnw test' CLAUDE.md
 ```
 
-Expected: `1`, `1`, `1`, `enlace ok`, `1`.
+Expected: `1`, `1`, `1`, `enlace ok`, `1`. Además, `grep -c 'up -d --wait --build' README.md CLAUDE.md` debe dar `1` en cada archivo.
 
 - [ ] **Step 4: Commit**
 
