@@ -1,0 +1,5 @@
+# Lista de permitidos: solo entra al contexto de construcción lo que las imágenes necesitan.
+*
+!docs/contracts/
+!inventory-service/
+inventory-service/target/
