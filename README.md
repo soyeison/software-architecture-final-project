@@ -8,9 +8,11 @@ Catálogo), comunicados mediante RabbitMQ.
 
 ## Estructura
 ```
+docs/contracts/           Contratos: OpenAPI, JSON Schema del evento (ver su README)
 docs/superpowers/specs/   Especificaciones de diseño
 docs/superpowers/plans/   Planes de implementación
-infra/                    Docker Compose, RabbitMQ y bases de datos
+infra/rabbitmq/           Topología y configuración de RabbitMQ
+scripts/                  Scripts de verificación y utilidades
 ```
 
-Las instrucciones para levantar y probar el sistema se agregarán en las siguientes fases.
+Para verificar los contratos: `scripts/verify-contracts.sh` (requiere Docker).

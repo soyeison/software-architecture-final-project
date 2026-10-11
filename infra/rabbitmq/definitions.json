@@ -1,0 +1,86 @@
+{
+  "users": [
+    {
+      "name": "retail",
+      "password_hash": "obLD1NheiS/aTagWaX9HNW3wzbbKSVmdvHBmKzWxlnlmfxnG",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "retail",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "inventory.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "catalog.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "catalog.inventory-stock-changed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic",
+        "x-dead-letter-exchange": "catalog.dlx",
+        "x-dead-letter-routing-key": "catalog.inventory-stock-changed.dlq"
+      }
+    },
+    {
+      "name": "catalog.inventory-stock-changed.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "inventory.events",
+      "vhost": "/",
+      "destination": "catalog.inventory-stock-changed",
+      "destination_type": "queue",
+      "routing_key": "inventory.stock.changed",
+      "arguments": {}
+    },
+    {
+      "source": "catalog.dlx",
+      "vhost": "/",
+      "destination": "catalog.inventory-stock-changed.dlq",
+      "destination_type": "queue",
+      "routing_key": "catalog.inventory-stock-changed.dlq",
+      "arguments": {}
+    }
+  ]
+}

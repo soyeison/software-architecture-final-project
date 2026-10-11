@@ -1,0 +1,8 @@
+{
+  "eventId": "5d1e7a2b-3c4f-4a6b-8d9e-0f1a2b3c4d5e",
+  "eventType": "InventoryStockChanged",
+  "newStock": 3,
+  "stockVersion": 10,
+  "channel": "ONLINE",
+  "occurredAt": "2026-10-10T15:06:00.000Z"
+}

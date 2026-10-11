@@ -27,3 +27,7 @@ Thumbs.db
 
 # Entorno local
 .env
+
+# Herramientas de trabajo de Claude Code (worktrees y espacio de trabajo de SDD)
+.claude/worktrees/
+.superpowers/

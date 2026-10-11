@@ -199,7 +199,7 @@ paths:
           content:
             application/problem+json:
               schema:
-                oneOf:
+                anyOf:
                   - $ref: '#/components/schemas/InsufficientStockProblem'
                   - $ref: '#/components/schemas/Problem'
               examples:
@@ -1088,7 +1088,7 @@ done
 check "mensaje rechazado llega a la DLQ" "$dlq_count" "1"
 
 check "usuario guest no existe" \
-  "$(curl -s -o /dev/null -w '%{http_code}' -u guest:guest "$API/overview")" "401"
+  "$(api "$API/users" | jq -r '[.[].name] | index("guest")')" "null"
 
 exit $status
 ```
@@ -1297,7 +1297,7 @@ Fuente de verdad de las interfaces del sistema (enfoque contrato primero). El di
 
 ## Verificación
 
-Requiere Docker. Desde cualquier directorio del repositorio:
+Requiere Docker. Desde la raíz del repositorio:
 
 ```bash
 scripts/verify-contracts.sh
@@ -1305,6 +1305,43 @@ scripts/verify-contracts.sh
 
 Ejecuta el lint de los OpenAPI (Redocly), la validación del schema y sus ejemplos
 (check-jsonschema) y una verificación de la topología sobre un RabbitMQ temporal.
+
+## Credenciales de demo (no aptas para producción)
+
+- Usuario `retail`, contraseña `retail-demo`, con el tag `administrator`. Ambos servicios
+  comparten este usuario solo para la demo (simplificación conocida).
+- No existe el usuario `guest`: RabbitMQ no lo crea cuando `infra/rabbitmq/definitions.json`
+  define los usuarios.
+- Testcontainers: un `RabbitMQContainer` que cargue `infra/rabbitmq/definitions.json` debe
+  configurarse con `.withAdminUser("retail").withAdminPassword("retail-demo")`; con el
+  `guest`/`guest` por defecto la autenticación falla.
+
+## Notas de implementación
+
+Puntos a tener en cuenta en las fases 4 y 5 para no divergir del contrato:
+
+- **`occurredAt`:** el schema exige exactamente 3 decimales; `Instant.toString()` imprime 0, 3, 6
+  o 9 dígitos (en Java 25 sobre Linux produce microsegundos y omite la fracción si los
+  milisegundos son 0). El productor debe truncar a milisegundos y usar un formateador fijo con
+  3 decimales en UTC.
+- **Versión de sembrado:** Inventario siembra `version = 1` (por eso `StockResponse.version`
+  tiene `minimum: 1`); el Catálogo siembra su versión interna del stock en `0` para que
+  cualquier primer evento (`stockVersion >= 1`) se aplique.
+- **`SaleRequest` estricto** (`additionalProperties: false`, `quantity` entero): Spring Boot por
+  defecto ignora propiedades desconocidas y Jackson convierte `1.5` o `"1"` a entero; hay que
+  configurar Jackson de forma estricta (por ejemplo `FAIL_ON_UNKNOWN_PROPERTIES` y
+  `ALLOW_COERCION_OF_SCALARS` desactivados) o el servicio divergirá del contrato.
+- **`ValidationProblem` exige `errors`:** un JSON mal formado también debe responder
+  `validation-error` con `errors` (puede ser `[]`).
+- **Publisher confirms + `mandatory = true`:** un mensaje devuelto por no tener cola destino
+  igualmente recibe ack del broker; hay que revisar `CorrelationData.getReturned()` antes de
+  marcar el evento como publicado en el outbox.
+- **401/403 en `application/problem+json`:** Spring Security genera esas respuestas antes de
+  llegar a los controladores; se requiere un `AuthenticationEntryPoint` y un
+  `AccessDeniedHandler` propios que escriban el `ProblemDetail` con `type`
+  `https://api.retail-demo.local/problems/unauthorized` o `.../forbidden`.
+- **`sku` inválido en la ruta:** un `sku` que no cumple el patrón del path responde
+  `404 not-found` (el patrón es informativo en la ruta; no se define un 400).
 
 ## Ejemplos del evento
 

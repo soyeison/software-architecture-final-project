@@ -1,0 +1,13 @@
+# Configuración de lint para los contratos OpenAPI (Redocly CLI).
+extends:
+  - recommended
+rules:
+  # Proyecto académico sin licencia declarada.
+  info-license: off
+  # Los servicios solo se ejecutan en local (Docker Compose).
+  no-server-example.com: off
+  # Listar productos no tiene errores 4xx legítimos.
+  operation-4xx-response: off
+  # Los ejemplos deben cumplir sus schemas y no debe haber componentes sin usar.
+  no-invalid-media-type-examples: error
+  no-unused-components: error
