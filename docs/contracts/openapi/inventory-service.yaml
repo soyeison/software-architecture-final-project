@@ -1,0 +1,370 @@
+openapi: 3.1.0
+info:
+  title: Inventory Service API
+  version: 1.0.0
+  description: |
+    Servicio de Inventario: única fuente de verdad del stock. Registra ventas de los canales
+    POS y ONLINE y, por cada venta confirmada, publica el evento `InventoryStockChanged`
+    (patrón Event-Driven Messaging con Transactional Outbox).
+
+    Es un servicio interno: los canales consultan disponibilidad a través del Servicio de Catálogo.
+servers:
+  - url: http://localhost:8081
+    description: Entorno local (Docker Compose)
+tags:
+  - name: Sales
+    description: Registro de ventas
+  - name: Stock
+    description: Consulta del stock (uso interno)
+  - name: Diagnostics
+    description: Endpoints de diagnóstico para la demo
+paths:
+  /api/v1/inventory/{sku}/sales:
+    post:
+      tags: [Sales]
+      operationId: registerSale
+      summary: Registrar una venta
+      description: |
+        Descuenta el stock del SKU y, en la misma transacción, guarda el evento
+        `InventoryStockChanged` en el outbox. El `saleId` de la respuesta es el `eventId`
+        del evento generado.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Sku'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleRequest'
+            example:
+              quantity: 1
+              channel: POS
+      responses:
+        '201':
+          description: Venta confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleResponse'
+              example:
+                saleId: 7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73
+                sku: TENIS-RUNNER-42
+                quantity: 1
+                channel: POS
+                remainingStock: 4
+                version: 8
+                occurredAt: '2026-10-10T15:04:05.123Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Stock insuficiente o modificación concurrente
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/InsufficientStockProblem'
+                  - $ref: '#/components/schemas/Problem'
+              examples:
+                insufficientStock:
+                  summary: Stock insuficiente
+                  value:
+                    type: https://api.retail-demo.local/problems/insufficient-stock
+                    title: Insufficient stock
+                    status: 409
+                    detail: SKU TENIS-RUNNER-42 has 0 units available, 1 requested
+                    instance: /api/v1/inventory/TENIS-RUNNER-42/sales
+                    availableStock: 0
+                    requestedQuantity: 1
+                concurrentModification:
+                  summary: Reintentos agotados por bloqueo optimista
+                  value:
+                    type: https://api.retail-demo.local/problems/concurrent-modification
+                    title: Concurrent modification
+                    status: 409
+                    detail: Stock of SKU TENIS-RUNNER-42 changed concurrently, please retry
+                    instance: /api/v1/inventory/TENIS-RUNNER-42/sales
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/inventory/{sku}:
+    get:
+      tags: [Stock]
+      operationId: getStock
+      summary: Consultar el stock actual de un SKU
+      description: Uso interno (operadores). Los canales consultan disponibilidad en el Catálogo.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Sku'
+      responses:
+        '200':
+          description: Stock actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResponse'
+              example:
+                sku: TENIS-RUNNER-42
+                stock: 4
+                version: 8
+                updatedAt: '2026-10-10T15:04:05.123Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/inventory/outbox:
+    get:
+      tags: [Diagnostics]
+      operationId: listOutboxEvents
+      summary: Listar eventos del outbox
+      description: |
+        Endpoint de diagnóstico para la demo (escenario "RabbitMQ caído"). Devuelve como máximo
+        50 eventos, los más recientes primero. En un entorno real estaría protegido o no existiría.
+      security: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filtra por estado. Sin este parámetro se devuelven ambos estados.
+          schema:
+            $ref: '#/components/schemas/OutboxStatus'
+      responses:
+        '200':
+          description: Eventos del outbox
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 50
+                items:
+                  $ref: '#/components/schemas/OutboxEvent'
+              example:
+                - eventId: 7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73
+                  sku: TENIS-RUNNER-42
+                  status: PENDING
+                  attempts: 3
+                  lastError: Connection refused
+                  occurredAt: '2026-10-10T15:04:05.123Z'
+                  publishedAt: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT HS256 emitido por `scripts/generate-token.sh`. Claims: `iss` = `retail-demo-auth`,
+        `sub`, `scope` (permisos separados por espacio: `inventory:sell`, `inventory:read`) y `exp`.
+  parameters:
+    Sku:
+      name: sku
+      in: path
+      required: true
+      description: Código del producto
+      schema:
+        type: string
+        pattern: '^[A-Z0-9][A-Z0-9-]*$'
+      example: TENIS-RUNNER-42
+  schemas:
+    Channel:
+      type: string
+      enum: [POS, ONLINE]
+      description: Canal de venta
+    OutboxStatus:
+      type: string
+      enum: [PENDING, PUBLISHED]
+    SaleRequest:
+      type: object
+      required: [quantity, channel]
+      additionalProperties: false
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+        channel:
+          $ref: '#/components/schemas/Channel'
+    SaleResponse:
+      type: object
+      required: [saleId, sku, quantity, channel, remainingStock, version, occurredAt]
+      properties:
+        saleId:
+          type: string
+          format: uuid
+          description: Igual al `eventId` del evento `InventoryStockChanged` generado
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        channel:
+          $ref: '#/components/schemas/Channel'
+        remainingStock:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+          description: Versión del stock tras la venta (igual al `stockVersion` del evento)
+        occurredAt:
+          type: string
+          format: date-time
+    StockResponse:
+      type: object
+      required: [sku, stock, version, updatedAt]
+      properties:
+        sku:
+          type: string
+        stock:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+        updatedAt:
+          type: string
+          format: date-time
+    OutboxEvent:
+      type: object
+      required: [eventId, sku, status, attempts, lastError, occurredAt, publishedAt]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        status:
+          $ref: '#/components/schemas/OutboxStatus'
+        attempts:
+          type: integer
+          minimum: 0
+        lastError:
+          type: [string, 'null']
+        occurredAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: [string, 'null']
+          format: date-time
+    Problem:
+      type: object
+      description: Detalle de error según RFC 9457
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, message]
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+    InsufficientStockProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [availableStock, requestedQuantity]
+          properties:
+            availableStock:
+              type: integer
+              minimum: 0
+            requestedQuantity:
+              type: integer
+              minimum: 1
+  responses:
+    ValidationError:
+      description: Petición inválida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          example:
+            type: https://api.retail-demo.local/problems/validation-error
+            title: Validation error
+            status: 400
+            detail: The request has invalid fields
+            instance: /api/v1/inventory/TENIS-RUNNER-42/sales
+            errors:
+              - field: quantity
+                message: must be greater than or equal to 1
+    Unauthorized:
+      description: Sin token, token inválido o expirado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.retail-demo.local/problems/unauthorized
+            title: Unauthorized
+            status: 401
+            detail: A valid bearer token is required
+            instance: /api/v1/inventory/TENIS-RUNNER-42/sales
+    Forbidden:
+      description: El token no tiene el permiso requerido
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.retail-demo.local/problems/forbidden
+            title: Forbidden
+            status: 403
+            detail: The token lacks the required scope
+            instance: /api/v1/inventory/TENIS-RUNNER-42/sales
+    NotFound:
+      description: SKU inexistente
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.retail-demo.local/problems/not-found
+            title: Not found
+            status: 404
+            detail: SKU UNKNOWN-SKU does not exist
+            instance: /api/v1/inventory/UNKNOWN-SKU
+    InternalError:
+      description: Error interno (sin detalles de implementación)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://api.retail-demo.local/problems/internal-error
+            title: Internal error
+            status: 500
+            detail: An unexpected error occurred
+            instance: /api/v1/inventory/TENIS-RUNNER-42/sales
