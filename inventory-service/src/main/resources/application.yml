@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: inventory-service
+
+server:
+  port: 8081
+
+inventory:
+  jwt:
+    # Sin valor por defecto: si falta JWT_SECRET el servicio no arranca.
+    secret: ${JWT_SECRET:}
+    issuer: retail-demo-auth
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
