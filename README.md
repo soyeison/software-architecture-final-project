@@ -24,7 +24,7 @@ scripts/                  Scripts de verificación y utilidades
 Requiere Docker con Compose.
 
 ```bash
-docker compose up -d --wait --build   # levanta la infraestructura y los servicios, reconstruyendo sus imágenes
+docker compose up -d --wait --build   # levanta la infraestructura y los servicios, reconstruyendo sus imágenes (la primera construcción requiere internet y tarda unos minutos)
 docker compose down -v        # borra contenedores, redes y volúmenes: reinicia el estado de la demo
 ```
 

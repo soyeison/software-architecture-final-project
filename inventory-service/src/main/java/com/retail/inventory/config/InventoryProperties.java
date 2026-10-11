@@ -30,5 +30,11 @@ public record InventoryProperties(@Valid @NotNull Jwt jwt) {
         public boolean isSecretLongEnough() {
             return secret != null && secret.getBytes(StandardCharsets.UTF_8).length >= MINIMUM_SECRET_BYTES;
         }
+
+        /** Oculta el secreto para que nunca aparezca en logs ni en mensajes de error. */
+        @Override
+        public String toString() {
+            return "Jwt[secret=<oculto>, issuer=" + issuer + "]";
+        }
     }
 }

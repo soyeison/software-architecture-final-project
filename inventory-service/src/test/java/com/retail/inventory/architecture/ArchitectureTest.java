@@ -10,7 +10,8 @@ import com.tngtech.archunit.lang.ArchRule;
 
 /**
  * Hace cumplir las reglas de dependencia de la spec de Inventario (sección 3). Algunas reglas
- * describen paquetes que llegan en sub-tareas posteriores; mientras no existan, se cumplen sin clases.
+ * describen paquetes que llegan en sub-tareas posteriores; solo las dos reglas sobre paquetes que
+ * aún no existen (las reglas 3 y 4) permiten evaluación vacía.
  */
 @AnalyzeClasses(packages = "com.retail.inventory", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
@@ -18,14 +19,12 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule featurePackagesAreFreeOfCycles = slices()
             .matching("com.retail.inventory.(*)..")
-            .should().beFreeOfCycles()
-            .allowEmptyShould(true);
+            .should().beFreeOfCycles();
 
     @ArchTest
     static final ArchRule onlyRabbitStockEventSenderUsesAmqp = noClasses()
             .that().doNotHaveSimpleName("RabbitStockEventSender")
-            .should().dependOnClassesThat().resideInAPackage("org.springframework.amqp..")
-            .allowEmptyShould(true);
+            .should().dependOnClassesThat().resideInAPackage("org.springframework.amqp..");
 
     @ArchTest
     static final ArchRule controllersDoNotUseRepositories = noClasses()

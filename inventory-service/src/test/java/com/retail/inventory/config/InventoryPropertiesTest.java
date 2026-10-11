@@ -42,4 +42,11 @@ class InventoryPropertiesTest {
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().rootCause().hasMessageContaining("at least 32 bytes"));
     }
+
+    @Test
+    void jwtToStringNeverRevealsSecret() {
+        String text = new InventoryProperties.Jwt(SECRET_OF_32_BYTES, "retail-demo-auth").toString();
+
+        assertThat(text).doesNotContain(SECRET_OF_32_BYTES).contains("retail-demo-auth");
+    }
 }

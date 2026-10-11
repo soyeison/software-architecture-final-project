@@ -26,7 +26,9 @@ servicio), JWT, Docker Compose.
 - Consumidores idempotentes (deduplicación por `eventId`), colas durables, ack manual y DLQ.
 
 ## Comandos
-- `docker compose up -d --wait` levanta RabbitMQ y las bases de datos; `docker compose down -v`
+- `docker compose up -d --wait` levanta RabbitMQ, las bases de datos e inventory-service (la primera
+  vez construye la imagen: requiere internet para Maven Central y Docker Hub y tarda unos minutos;
+  `--build` la reconstruye); `docker compose down -v`
   borra contenedores, redes y volúmenes (reinicia el estado de la demo); `stop`/`start` conservan
   los datos.
 - `scripts/verify-contracts.sh` verifica los contratos; `scripts/verify-infra.sh` verifica la
