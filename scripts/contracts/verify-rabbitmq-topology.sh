@@ -75,6 +75,6 @@ done
 check "mensaje rechazado llega a la DLQ" "$dlq_count" "1"
 
 check "usuario guest no existe" \
-  "$(curl -s -o /dev/null -w '%{http_code}' -u guest:guest "$API/overview")" "401"
+  "$(api "$API/users" | jq -r '[.[].name] | index("guest")')" "null"
 
 exit $status
