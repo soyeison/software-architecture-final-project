@@ -9,8 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+import java.util.Date;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,6 +26,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.retail.inventory.support.TestTokens;
 
 /**
@@ -146,6 +154,54 @@ class SecurityIntegrationTest {
             "/openapi/inventory-service.yaml"})
     void documentationAndHealthArePublic(String path) throws Exception {
         mockMvc.perform(get(path)).andExpect(status().isOk());
+    }
+
+    @Test
+    void unsignedAlgNoneTokenIsUnauthorized() throws Exception {
+        Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+        String header = encoder.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
+        String payload = encoder.encodeToString(("{\"iss\":\"" + TestTokens.ISSUER
+                + "\",\"scope\":\"inventory:sell inventory:read\",\"exp\":"
+                + Instant.now().plus(1, ChronoUnit.HOURS).getEpochSecond() + "}").getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(get(STOCK_PATH).header(HttpHeaders.AUTHORIZATION, bearer(header + "." + payload + ".")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenSignedWithHs384IsUnauthorized() throws Exception {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(TestTokens.ISSUER)
+                .claim("scope", "inventory:sell inventory:read")
+                .expirationTime(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
+                .build();
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS384), claims);
+        // HS384 exige una clave de al menos 48 bytes; la longitud de la clave no importa, solo el algoritmo del encabezado
+        jwt.sign(new MACSigner((TestTokens.SECRET + TestTokens.SECRET).getBytes(StandardCharsets.UTF_8)));
+
+        mockMvc.perform(get(STOCK_PATH).header(HttpHeaders.AUTHORIZATION, bearer(jwt.serialize())))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void outboxWithTrailingSlashIsNotPublic() throws Exception {
+        mockMvc.perform(get("/api/v1/inventory/outbox/")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void nestedPathIsDeniedWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/v1/inventory/a/b")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void postToOutboxIsDeniedWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/v1/inventory/outbox")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenWithoutScopeIsForbiddenOnProtectedRoute() throws Exception {
+        mockMvc.perform(get(STOCK_PATH).header(HttpHeaders.AUTHORIZATION, bearer(TestTokens.withScope(""))))
+                .andExpect(status().isForbidden());
     }
 
     private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sale(String token) {

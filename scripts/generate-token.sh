@@ -24,8 +24,15 @@ secret="${JWT_SECRET:-}"
 if [[ -z "$secret" ]]; then
   for environment_file in "$ROOT/.env" "$ROOT/.env.example"; do
     if [[ -f "$environment_file" ]]; then
-      secret="$(grep -E '^JWT_SECRET=' "$environment_file" | tail -n 1 | cut -d '=' -f 2-)"
-      [[ -n "$secret" ]] && break
+      secret="$(grep -E '^JWT_SECRET=' "$environment_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+      # Normaliza el valor: quita el CR final (archivos CRLF) y un par de comillas envolventes
+      secret="${secret%$'\r'}"
+      if [[ "$secret" == \"*\" || "$secret" == \'*\' ]]; then
+        secret="${secret:1:${#secret}-2}"
+      fi
+      if [[ -n "$secret" ]]; then
+        break
+      fi
     fi
   done
 fi
