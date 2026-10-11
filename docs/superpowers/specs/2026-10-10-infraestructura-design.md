@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-10-10
 - **Fase:** 3 (orquestación e infraestructura)
-- **Estado:** pendiente de revisión
+- **Estado:** aprobada
 - **Depende de:** [Spec global](2026-10-09-solucion-global-design.md) y [Spec de contratos](2026-10-10-contratos-design.md)
 
 ## 1. Objetivo y alcance
@@ -70,8 +70,9 @@ configuraciones (`infra/rabbitmq/`, que ya existe).
   `rabbitmq-diagnostics -q check_running` en RabbitMQ. `--wait` espera a que los tres estén sanos.
   Las fases 4 y 5 agregarán `depends_on` con `condition: service_healthy`.
 - **Sin volúmenes con nombre:** los datos sobreviven a `docker compose stop` y `start` (lo que
-  necesitan los escenarios 5 y 8) y `docker compose down` deja todo limpio, que es el reinicio de
-  la demo. `down` borra los datos, y para una demo es el comportamiento buscado.
+  necesitan los escenarios 5 y 8, porque el contenedor se mantiene) y `docker compose down -v`
+  borra contenedores, redes y volúmenes, que es el reinicio de la demo. Las imágenes de PostgreSQL
+  y RabbitMQ declaran volúmenes anónimos que `down` solo no elimina; por eso el reinicio usa `-v`.
 - **Sin política `restart`:** un contenedor detenido a propósito en la demo debe quedarse detenido.
 
 ## 4. Redes y aislamiento
@@ -94,10 +95,13 @@ Esta es la interfaz que implementan las fases 4 y 5. Usan los nombres que Spring
 |---|---|---|
 | `SERVER_PORT` | `8081` | `8082` |
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://inventory-db:5432/inventory` | `jdbc:postgresql://catalog-db:5432/catalog` |
-| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `inventory` / `inventory-demo` | `catalog` / `catalog-demo` |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `inventory` / `${INVENTORY_DB_PASSWORD:-inventory-demo}` | `catalog` / `${CATALOG_DB_PASSWORD:-catalog-demo}` |
 | `SPRING_RABBITMQ_HOST` / `SPRING_RABBITMQ_PORT` | `rabbitmq` / `5672` | `rabbitmq` / `5672` |
 | `SPRING_RABBITMQ_USERNAME` / `SPRING_RABBITMQ_PASSWORD` | `retail` / `retail-demo` | `retail` / `retail-demo` |
 | `JWT_SECRET` | valor de demo (al menos 32 bytes) | no aplica |
+
+PostgreSQL aplica la contraseña solo la primera vez que crea la base, así que cambiar una
+contraseña de base de datos en `.env` exige `docker compose down -v` antes del siguiente `up`.
 
 Dos modos de ejecución de un servicio:
 
@@ -124,9 +128,13 @@ E2E.
 | `MOCHILA-TRAIL-20L` | Mochila Trail 20 L | 189 900 | 10 | Catálogo caído (varias ventas acumuladas) |
 | `BOTELLA-TERMICA-750` | Botella térmica 750 ml | 59 900 | 10 | RabbitMQ caído (outbox) |
 | `GORRA-SPORT-NEGRA` | Gorra Sport negra | 39 900 | 50 | Medición de latencia (20 ventas, con margen) |
+| `CALCETINES-PACK-3` | Calcetines deportivos pack x3 | 24 900 | 20 | Eventos inyectados directamente (duplicado y fuera de orden) |
 
 - Cada escenario usa **su propio SKU**, así que no se interfieren y pueden ensayarse en cualquier
-  orden. Para volver al estado inicial basta `docker compose down` y `up`.
+  orden. Los escenarios que inyectan eventos directamente en RabbitMQ (duplicado y fuera de orden)
+  usan `CALCETINES-PACK-3`: para ese SKU el estado del Catálogo puede divergir del de Inventario
+  por diseño, así que ningún otro escenario debe usarlo. Para volver al estado inicial basta
+  `docker compose down -v` y `up`.
 - **Inventario** siembra `version = 1` con el stock de la tabla.
 - **Catálogo** siembra la misma disponibilidad, su versión interna en `0` (de modo que cualquier
   primer evento, con `stockVersion >= 1`, se aplique), `updatedAt` igual a la hora del sembrado y
@@ -136,7 +144,7 @@ E2E.
 
 ## 7. Verificación
 
-Un script, `scripts/verify-infra.sh`, que se ejecuta solo con Docker (sin instalar nada). Se
+Un script, `scripts/verify-infra.sh`, que se ejecuta con Docker, curl y jq. Se
 escribe primero, se ve fallar y después se crea el Compose hasta que pasa.
 
 - Usa un **nombre de proyecto propio** (`retail-verify`) y **puertos propios** mediante las
@@ -147,13 +155,13 @@ escribe primero, se ve fallar y después se crea el Compose hasta que pasa.
 | # | Comprobación | Qué demuestra |
 |---|---|---|
 | 1 | `docker compose config -q` | El archivo es válido |
-| 2 | `docker compose up -d --wait` termina bien | Los tres servicios llegan a *healthy* |
+| 2 | `docker compose up -d --wait` termina bien; los puertos se publican solo en `127.0.0.1`; el Compose no declara volúmenes con nombre | Los tres servicios llegan a *healthy*, y `down -v` no puede borrar volúmenes con nombre |
 | 3 | Cada base acepta su propio usuario (`select 1`) y rechaza el del otro | Credenciales y bases separadas |
 | 4 | Desde una red temporal equivalente a `catalog-net`, `catalog-db` resuelve e `inventory-db` no | El aislamiento de redes funciona |
 | 5 | La consola de RabbitMQ responde y la API lista los exchanges y colas de la topología | `definitions.json` se cargó dentro del Compose |
 | 6 | Se publica un mensaje persistente, `stop` y `start` de `rabbitmq`, y el mensaje sigue en la cola | Lo que necesita el escenario 8 |
 | 7 | Se inserta una fila, `stop` y `start` de la base, y la fila sigue | Los datos sobreviven sin volúmenes con nombre |
-| 8 | `docker compose down` y `up --wait`, y la fila ya no está | `down` es el reinicio de la demo |
+| 8 | `docker compose down -v` y `up --wait`, y la fila ya no está | `down -v` es el reinicio de la demo |
 
 La semántica de la topología (enrutamiento, dead-lettering) ya se verifica en
 `scripts/contracts/verify-rabbitmq-topology.sh`; aquí solo se comprueba que el broker del Compose
@@ -166,7 +174,7 @@ sección 5, porque los servicios aún no existen.
 
 - **README principal:** sección "Infraestructura" con cómo levantarla
   (`docker compose up -d --wait`), cómo levantar solo la infraestructura, cómo reiniciar el estado
-  de la demo (`docker compose down` y `up`), una tabla de puertos, URLs y credenciales de demo
+  de la demo (`docker compose down -v` y `up`), una tabla de puertos, URLs y credenciales de demo
   (consola de RabbitMQ en `http://localhost:15672`, con `retail` / `retail-demo`) con la
   advertencia de que no son aptas para producción, los dos modos de ejecución de un servicio y las
   notas de problemas conocidos (puertos ocupados y la opción `:z` por SELinux). Se corrige la

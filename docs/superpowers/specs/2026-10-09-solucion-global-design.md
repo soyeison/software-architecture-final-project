@@ -91,8 +91,9 @@ previo.
 ### 3.5 Datos de partida
 
 Ambos servicios arrancan con los mismos SKU sembrados: Inventario con cantidades y Catálogo con
-datos de producto y disponibilidad inicial. Los SKU de la demo tienen nombres legibles (por
-ejemplo `TENIS-RUNNER-42` con stock 1 para el escenario de la última unidad).
+datos de producto y disponibilidad inicial. El conjunto de SKU, con el escenario que usa cada
+uno, está en [`docs/seed-data.md`](../../seed-data.md). Inventario siembra `version = 1` y el
+Catálogo su versión interna en `0`.
 
 ### 3.6 Seguridad
 
@@ -111,7 +112,8 @@ Los `401` y `403` de Spring Security se adaptan al mismo formato.
 
 Monorepo con dos proyectos Maven independientes (`inventory-service/`, `catalog-service/`), sin
 módulo compartido. Cada servicio tiene su propia clase del evento; el contrato común vive en
-`docs/contracts/`. La infraestructura vive en `infra/` y los scripts E2E en `e2e/`.
+`docs/contracts/`. El `docker-compose.yml` vive en la raíz, las configuraciones de la infraestructura en `infra/` y
+los scripts E2E en `e2e/`.
 
 ## 4. Flujo de datos y escenarios
 
