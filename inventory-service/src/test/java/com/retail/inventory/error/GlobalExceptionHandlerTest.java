@@ -11,12 +11,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * Prueba solo el manejo de errores: los filtros de seguridad se desactivan y la seguridad se prueba
+ * aparte (spec de Inventario §5).
+ */
 @WebMvcTest
+@AutoConfigureMockMvc(addFilters = false)
 @Import(ProbeController.class)
 class GlobalExceptionHandlerTest {
 

@@ -12,6 +12,8 @@ import org.springframework.http.ProblemDetail;
 public enum ProblemType {
 
     VALIDATION_ERROR("validation-error", "Validation error", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED("unauthorized", "Unauthorized", HttpStatus.UNAUTHORIZED),
+    FORBIDDEN("forbidden", "Forbidden", HttpStatus.FORBIDDEN),
     NOT_FOUND("not-found", "Not found", HttpStatus.NOT_FOUND),
     INTERNAL_ERROR("internal-error", "Internal error", HttpStatus.INTERNAL_SERVER_ERROR);
 

@@ -38,6 +38,8 @@ servicio), JWT, Docker Compose.
   integración). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
 - Tras cambiar el código de un servicio, `docker compose up -d --wait --build`: sin `--build`,
   Compose reutiliza la imagen anterior.
+- `scripts/generate-token.sh <pos|online|operator|no-scope>` genera un JWT de demo para Inventario
+  (toma `JWT_SECRET` del entorno, de `.env` o de `.env.example`).
 
 ## Convenciones
 - **Código en inglés**: identificadores, clases, métodos, variables, paquetes, endpoints, nombres

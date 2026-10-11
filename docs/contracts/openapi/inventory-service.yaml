@@ -322,6 +322,12 @@ components:
                 message: must be greater than or equal to 1
     Unauthorized:
       description: Sin token, token inválido o expirado
+      headers:
+        WWW-Authenticate:
+          description: Esquema de autenticación requerido (RFC 6750)
+          schema:
+            type: string
+            const: Bearer
       content:
         application/problem+json:
           schema:

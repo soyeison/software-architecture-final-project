@@ -37,7 +37,7 @@ Para levantar solo la infraestructura:
 | Consola de RabbitMQ | http://localhost:15672 | — | `retail` / `retail-demo` |
 | Base de Inventario | `localhost:5441` | `inventory-db:5432` | `inventory` / `inventory-demo`, base `inventory` |
 | Base de Catálogo | `localhost:5442` | `catalog-db:5432` | `catalog` / `catalog-demo`, base `catalog` |
-| Servicio de Inventario | http://localhost:8081 (Swagger UI en `/swagger-ui/index.html`) | `inventory-service:8081` | JWT (desde la sub-tarea 4.2) |
+| Servicio de Inventario | http://localhost:8081 (Swagger UI en `/swagger-ui/index.html`) | `inventory-service:8081` | JWT de demo: `scripts/generate-token.sh <perfil>` |
 
 Son credenciales de **demo, no aptas para producción**. Los puertos se publican solo en
 `127.0.0.1`.
@@ -79,6 +79,19 @@ cd inventory-service
 Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su contenedor
 (`docker compose stop inventory-service`) y definir `JWT_SECRET` con al menos 32 bytes, por ejemplo
 el valor de `.env.example`. Sin `JWT_SECRET` válido el servicio no arranca, a propósito.
+
+Tokens de demo (bash y openssl, sin dependencias): `scripts/generate-token.sh pos` u `online` para
+vender, `operator` para consultar el stock y `no-scope` para probar el 403. El script toma
+`JWT_SECRET` del entorno, de `.env` o de `.env.example`, así que coincide con el Compose sin
+configurar nada.
+
+```bash
+TOKEN="$(scripts/generate-token.sh operator)"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/inventory/TENIS-RUNNER-42
+```
+
+Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
+qué rutas existen. `/v3/api-docs` también se deniega; el contrato publicado es el de Swagger UI.
 
 ## Verificación
 
