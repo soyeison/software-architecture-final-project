@@ -47,4 +47,47 @@ for target in "rabbitmq 5672" "rabbitmq 15672" "inventory-db 5432" "catalog-db 5
   check "puerto ${target#* } de ${target% *} publicado solo en 127.0.0.1" "${published%%:*}" "127.0.0.1"
 done
 
+# Helpers de las secciones 3 a 5
+PG_IMAGE="postgres:17-alpine"
+RABBIT_API="http://127.0.0.1:${RABBITMQ_MGMT_PORT}/api"
+RABBIT_AUTH="retail:retail-demo"
+QUEUE="catalog.inventory-stock-changed"
+
+rabbit_api() { curl -s --max-time 10 -u "$RABBIT_AUTH" -H "content-type: application/json" "$@"; }
+pg_select_1() { # pg_select_1 <red> <host> <usuario> <contraseña> <base>: imprime 1 o "error" (autentica por TCP)
+  docker run --rm --network "$1" -e PGPASSWORD="$4" "$PG_IMAGE" \
+    psql -h "$2" -U "$3" -d "$5" -tAc 'select 1' 2>/dev/null || echo "error"
+}
+resolves() { # resolves <red> <nombre>: imprime resolves o unresolved
+  if docker run --rm --network "$1" "$PG_IMAGE" getent hosts "$2" >/dev/null 2>&1; then echo "resolves"; else echo "unresolved"; fi
+}
+
+echo "== 3. Credenciales =="
+check "inventory acepta su usuario"        "$(pg_select_1 retail-verify_inventory-net inventory-db inventory inventory-demo inventory)" "1"
+check "catalog acepta su usuario"          "$(pg_select_1 retail-verify_catalog-net catalog-db catalog catalog-demo catalog)" "1"
+check "inventory rechaza una contraseña incorrecta" "$(pg_select_1 retail-verify_inventory-net inventory-db inventory incorrecta inventory)" "error"
+check "inventory rechaza al usuario de catalog" "$(pg_select_1 retail-verify_inventory-net inventory-db catalog catalog-demo inventory)" "error"
+check "catalog rechaza al usuario de inventory" "$(pg_select_1 retail-verify_catalog-net catalog-db inventory inventory-demo catalog)" "error"
+
+echo "== 4. Aislamiento de redes =="
+check "catalog-net resuelve catalog-db"      "$(resolves retail-verify_catalog-net catalog-db)" "resolves"
+check "catalog-net NO resuelve inventory-db" "$(resolves retail-verify_catalog-net inventory-db)" "unresolved"
+check "inventory-net resuelve inventory-db"  "$(resolves retail-verify_inventory-net inventory-db)" "resolves"
+check "inventory-net NO resuelve catalog-db" "$(resolves retail-verify_inventory-net catalog-db)" "unresolved"
+check "messaging resuelve rabbitmq"          "$(resolves retail-verify_messaging rabbitmq)" "resolves"
+check "messaging NO resuelve inventory-db"   "$(resolves retail-verify_messaging inventory-db)" "unresolved"
+check "messaging NO resuelve catalog-db"     "$(resolves retail-verify_messaging catalog-db)" "unresolved"
+
+echo "== 5. Topología de RabbitMQ cargada =="
+check "la consola de RabbitMQ responde" \
+  "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -u "$RABBIT_AUTH" "$RABBIT_API/overview")" "200"
+check "exchange inventory.events (topic, durable)" \
+  "$(rabbit_api "$RABBIT_API/exchanges/%2F/inventory.events" | jq -r '"\(.type) \(.durable)"')" "topic true"
+check "exchange catalog.dlx (direct, durable)" \
+  "$(rabbit_api "$RABBIT_API/exchanges/%2F/catalog.dlx" | jq -r '"\(.type) \(.durable)"')" "direct true"
+check "cola $QUEUE (durable)" \
+  "$(rabbit_api "$RABBIT_API/queues/%2F/$QUEUE" | jq -r '.durable')" "true"
+check "cola $QUEUE.dlq (durable)" \
+  "$(rabbit_api "$RABBIT_API/queues/%2F/$QUEUE.dlq" | jq -r '.durable')" "true"
+
 exit $status
