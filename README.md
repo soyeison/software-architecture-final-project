@@ -145,9 +145,20 @@ cd catalog-service
 ```
 
 Es el consumidor del flujo: mantiene la vista de disponibilidad con los eventos de Inventario y la
-expone por REST sin token. En esta etapa solo está el esqueleto (arranca, sirve Swagger UI con el
-contrato y responde errores en `application/problem+json`); la consulta de productos y el consumidor de
-eventos llegan en las siguientes sub-tareas.
+expone por REST sin token. La consulta ya está disponible (el consumidor de eventos llega en las
+siguientes sub-tareas): la base `catalog-db` se siembra con los 7 productos de `docs/seed-data.md`.
+
+```bash
+curl http://localhost:8082/api/v1/catalog/products                    # todos, ordenados por SKU
+curl http://localhost:8082/api/v1/catalog/products/TENIS-RUNNER-42    # uno (404 si no existe)
+```
+
+El contrato publicado es el que muestra Swagger UI (`/swagger-ui/index.html`, escrito a mano);
+`/v3/api-docs` es la vista generada del código y solo informativa.
+
+Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su contenedor
+(`docker compose stop catalog-service`) y levantar su base (`docker compose up -d --wait catalog-db`,
+puerto 5442). `./mvnw verify` requiere Docker (PostgreSQL con Testcontainers).
 
 ## Verificación
 
