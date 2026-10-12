@@ -235,6 +235,56 @@ expect "wait_until: el tiempo máximo por llamada se respeta (1 s)" \
 expect "wait_until: el tiempo máximo por llamada no altera el global" "$WAIT_TIMEOUT_SECONDS" "2"
 E2E_STATUS=0
 
+# --- Informes, ejecución de escenarios y run-all (sin Docker: escenarios simulados) ---
+source "$(dirname "${BASH_SOURCE[0]}")/report.sh"
+
+expect "format_duration_ms: segundos con un decimal" "$(format_duration_ms 6511)" "6.5 s"
+expect "format_duration_ms: cero" "$(format_duration_ms 0)" "0.0 s"
+expect "format_duration_ms: más de un minuto" "$(format_duration_ms 125400)" "125.4 s"
+expect "improvement_factor: 30 min frente a 571 ms" "$(improvement_factor 1800000 571)" "3152"
+expect "improvement_factor: admite decimales" "$(improvement_factor 900000 366.1)" "2458"
+expect "improvement_factor: un después de 0 ms se toma como 1 ms" "$(improvement_factor 1800000 0)" "1800000"
+
+latency_report="$(render_latency_report 2026-10-12T10:00:00Z GORRA-SPORT-NEGRA 1000 51 312.4 571 580 POS:51 ONLINE:571 POS:315)"
+expect "render_latency_report: cabecera" "$(head -1 <<<"$latency_report")" "# Latencia de propagación venta → Catálogo"
+expect "render_latency_report: fecha" "$(grep -c 'Fecha (UTC):\*\* 2026-10-12T10:00:00Z' <<<"$latency_report")" "1"
+expect "render_latency_report: número de muestras" "$(grep -c 'Muestras:\*\* 3 ventas de `GORRA-SPORT-NEGRA`' <<<"$latency_report")" "1"
+expect "render_latency_report: fila de estadísticas" "$(grep -c '^| 51 ms | 312.4 ms | 571 ms | 580 ms |$' <<<"$latency_report")" "1"
+expect "render_latency_report: comparación con el antes" "$(grep -c 'p95 medido: 571 ms' <<<"$latency_report")" "1"
+expect "render_latency_report: factor de mejora" "$(grep -c 'unas \*\*3152 veces\*\*' <<<"$latency_report")" "1"
+expect "render_latency_report: cumple el objetivo" "$(grep -c 'cumple: sí' <<<"$latency_report")" "1"
+expect "render_latency_report: una fila por muestra" "$(grep -c '^| [0-9]* | \(POS\|ONLINE\) | [0-9]* |$' <<<"$latency_report")" "3"
+expect "render_latency_report: muestra con su canal" "$(grep -c '^| 2 | ONLINE | 571 |$' <<<"$latency_report")" "1"
+over_limit_report="$(render_latency_report 2026-10-12T10:00:00Z X 500 51 312.4 571 580 POS:571)"
+expect "render_latency_report: no cumple si el p95 supera el límite" "$(grep -c 'cumple: no' <<<"$over_limit_report")" "1"
+
+fake_dir="$(mktemp -d)"
+printf '#!/usr/bin/env bash\necho "salida del escenario ok"\necho "METRIC alpha_ms=10"\nexit 0\n' >"$fake_dir/01-ok.sh"
+printf '#!/usr/bin/env bash\necho "salida del escenario roto"\necho "METRIC beta_ms=20"\nexit 1\n' >"$fake_dir/02-broken.sh"
+printf '#!/usr/bin/env bash\necho "METRIC gamma_ms=30"\nexit 0\n' >"$fake_dir/03-ok-too.sh"
+scenario_output="$(mktemp)"
+run_scenario "$fake_dir/01-ok.sh" >"$scenario_output"
+run_scenario "$fake_dir/02-broken.sh" >>"$scenario_output"
+run_scenario "$fake_dir/03-ok-too.sh" >>"$scenario_output"
+expect "run_scenario: registra los nombres en orden" "${RESULT_NAMES[*]}" "01-ok 02-broken 03-ok-too"
+expect "run_scenario: registra PASS o FAIL según el código de salida" "${RESULT_STATUS[*]}" "PASS FAIL PASS"
+expect "run_scenario: solo recoge métricas de los escenarios que terminan bien" "${METRIC_LINES[*]}" "alpha_ms=10 gamma_ms=30"
+expect "run_scenario: muestra la salida del escenario en vivo" "$(grep -c 'salida del escenario roto' "$scenario_output")" "1"
+expect "run_scenario: duraciones enteras" "$(is_integer "${RESULT_DURATION_MS[0]}")" "yes"
+expect "count_passed: cuenta solo los PASS" "$(count_passed)" "2"
+
+summary="$(render_summary)"
+expect "render_summary: fila de un escenario roto" "$(grep -c '^02-broken *FAIL' <<<"$summary")" "1"
+expect "render_summary: lista las métricas" "$(grep -c '^  alpha_ms=10$' <<<"$summary")" "1"
+expect "render_summary: no lista la métrica de un escenario roto" "$(grep -c 'beta_ms' <<<"$summary")" "0"
+expect "render_summary: total de escenarios OK" "$(grep -c '^2 de 3 escenarios OK$' <<<"$summary")" "1"
+run_report="$(render_run_report 2026-10-12T10:00:00Z)"
+expect "render_run_report: resultado global" "$(grep -c 'Resultado:\*\* 2 de 3 escenarios OK' <<<"$run_report")" "1"
+expect "render_run_report: fila de tabla" "$(grep -c '^| 02-broken | FAIL | ' <<<"$run_report")" "1"
+expect "render_run_report: métrica en tabla" "$(grep -c '^| gamma_ms | 30 |$' <<<"$run_report")" "1"
+rm -rf "$fake_dir" "$scenario_output"
+RESULT_NAMES=(); RESULT_STATUS=(); RESULT_DURATION_MS=(); METRIC_LINES=()
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1
