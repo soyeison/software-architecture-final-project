@@ -19,6 +19,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.retail.inventory.stock.SkuNotFoundException;
+
 /**
  * Traduce excepciones a respuestas {@code application/problem+json} (RFC 9457). Las excepciones
  * estándar de Spring MVC conservan su estado HTTP (405, 415, ...) gracias a
@@ -55,6 +57,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         ProblemDetail problem = ProblemType.NOT_FOUND
                 .toProblemDetail("The requested resource does not exist", requestPath(request));
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    @ExceptionHandler(SkuNotFoundException.class)
+    public ResponseEntity<ProblemDetail> handleSkuNotFound(SkuNotFoundException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemType.NOT_FOUND.toProblemDetail(exception.getMessage(), request.getRequestURI());
         return ResponseEntity.status(problem.getStatus()).body(problem);
     }
 

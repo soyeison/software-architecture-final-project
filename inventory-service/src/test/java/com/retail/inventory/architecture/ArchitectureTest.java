@@ -9,9 +9,8 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
- * Hace cumplir las reglas de dependencia de la spec de Inventario (sección 3). Algunas reglas
- * describen paquetes que llegan en sub-tareas posteriores; solo las dos reglas sobre paquetes que
- * aún no existen (las reglas 3 y 4) permiten evaluación vacía.
+ * Hace cumplir las reglas de dependencia de la spec de Inventario (sección 3). Ninguna regla permite
+ * evaluación vacía: si un paquete deja de tener clases que evaluar, la prueba falla.
  */
 @AnalyzeClasses(packages = "com.retail.inventory", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
@@ -29,14 +28,12 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersDoNotUseRepositories = noClasses()
             .that().haveSimpleNameEndingWith("Controller")
-            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
-            .allowEmptyShould(true);
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository");
 
     @ArchTest
     static final ArchRule stockAndSaleStayIndependentOfWebAndMessaging = noClasses()
             .that().resideInAnyPackage("com.retail.inventory.stock..", "com.retail.inventory.sale..")
             .and().haveSimpleNameNotEndingWith("Controller")
             .should().dependOnClassesThat().resideInAPackage("org.springframework.web..")
-            .orShould().dependOnClassesThat().haveSimpleName("RabbitStockEventSender")
-            .allowEmptyShould(true);
+            .orShould().dependOnClassesThat().haveSimpleName("RabbitStockEventSender");
 }

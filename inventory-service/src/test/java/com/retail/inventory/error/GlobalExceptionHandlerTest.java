@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Prueba solo el manejo de errores: los filtros de seguridad se desactivan y la seguridad se prueba
  * aparte (spec de Inventario §5).
  */
-@WebMvcTest
+@WebMvcTest(controllers = ProbeController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import(ProbeController.class)
 class GlobalExceptionHandlerTest {
