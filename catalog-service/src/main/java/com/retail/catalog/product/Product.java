@@ -73,10 +73,12 @@ public class Product {
         if (newStock < 0) {
             throw new IllegalArgumentException("newStock must not be negative");
         }
+        // Se calcula antes de mutar nada: si occurredAt o now son nulos, el producto queda intacto.
+        long latencyMs = Math.max(0, Duration.between(occurredAt, now).toMillis());
         this.availableStock = newStock;
         this.stockVersion = newStockVersion;
         this.updatedAt = now;
-        this.lastEventLatencyMs = Math.max(0, Duration.between(occurredAt, now).toMillis());
+        this.lastEventLatencyMs = latencyMs;
     }
 
     public String getSku() {

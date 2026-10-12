@@ -37,13 +37,15 @@ public enum ProblemType {
 
     /**
      * {@code instance} es un URI, pero la ruta de la petición puede traer caracteres que {@code URI.create}
-     * rechaza (p. ej., {@code [}): en ese caso se codifica en lugar de fallar dentro del manejador de errores.
+     * rechaza (p. ej., {@code [} o {@code {}): en ese caso se codifica en lugar de fallar dentro del manejador de
+     * errores. Se codifica sobre el componente ya construido ({@code build().encode()}), porque el
+     * {@code encode()} del constructor interpreta las llaves como variables de plantilla.
      */
     static URI toInstance(String requestPath) {
         try {
             return URI.create(requestPath);
         } catch (IllegalArgumentException exception) {
-            return UriComponentsBuilder.fromPath(requestPath).encode().build().toUri();
+            return UriComponentsBuilder.fromPath(requestPath).build().encode().toUri();
         }
     }
 

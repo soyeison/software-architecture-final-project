@@ -235,6 +235,9 @@ del `content_type`). Clasifica cada fallo según su causa:
   (`RabbitIntegrationTest`), como en Inventario. Las clases que dependen de filas ajenas las vacían
   (`TRUNCATE`) en `@BeforeEach`; un contexto con el listener activo que no deba sobrevivir a su clase usa
   `@DirtiesContext`.
+- Las pruebas de integración de 5.3 y 5.4 usan productos `TEST-<UUID>` y solo vacían `processed_events`
+  (`TRUNCATE`); nunca vacían `products` ni modifican los SKU sembrados, porque `SeedDataIntegrationTest` y
+  `ProductEndpointIntegrationTest` dependen de la semilla intacta y todas las clases comparten una base.
 - Sin meta numérica de cobertura: cada comportamiento de las secciones 4 a 6 tiene al menos una prueba.
 
 **Unitarias:** `Product.applyStock` (stock, versión, latencia, latencia negativa → 0), la política de
@@ -299,7 +302,7 @@ verificado en Inventario.
 
 | Pendiente | Sub-tarea |
 |---|---|
-| `URI.create(requestPath)` en `GlobalExceptionHandler` y `ProblemType` de **Inventario** lanza si la ruta trae `[` o `]` (corregido en el Catálogo en la 5.2 con `ProblemType.toInstance`; aplicar lo mismo allí) | Cualquier cambio futuro en Inventario |
+| `URI.create(requestPath)` en `GlobalExceptionHandler` y `ProblemType` de **Inventario** lanza si la ruta trae `[` o `]` (corregido en el Catálogo en la 5.2 con `ProblemType.toInstance`, que usa `UriComponentsBuilder.fromPath(...).build().encode()`; aplicar lo mismo en Inventario) | Cualquier cambio futuro en Inventario |
 | Endurecer la regla 2 de ArchUnit (`StockEventListener` por nombre simple) restringiéndola también al paquete `stockevent` | 5.4 |
 | `ClockConfigurationTest` de Inventario usa la variable de bucle `i` en lugar de `index` | Cualquier cambio futuro en Inventario |
 

@@ -51,6 +51,20 @@ class ProductTest {
     }
 
     @Test
+    void aNullOccurrenceTimeLeavesTheProductUntouched() {
+        Product product = product();
+        Instant now = Instant.parse("2026-10-12T11:00:00Z");
+
+        assertThatThrownBy(() -> product.applyStock(4, 2L, null, now))
+                .isInstanceOf(NullPointerException.class);
+
+        assertThat(product.getAvailableStock()).isEqualTo(5);
+        assertThat(product.getStockVersion()).isZero();
+        assertThat(product.getUpdatedAt()).isEqualTo(SEEDED_AT);
+        assertThat(product.getLastEventLatencyMs()).isNull();
+    }
+
+    @Test
     void aNegativeStockIsRejectedAndLeavesTheProductUntouched() {
         Product product = product();
 
