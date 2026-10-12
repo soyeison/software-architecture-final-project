@@ -55,18 +55,30 @@ public class StockEventListener {
     @RabbitListener(id = StockEventListener.LISTENER_ID, queues = "${catalog.consumer.queue}")
     public void onMessage(Message message, Channel channel) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        StockChangedEvent event;
         try {
-            StockChangedEvent event = reader.read(message.getBody());
-            try (MDC.MDCCloseable skuKey = MDC.putCloseable("sku", event.sku());
-                    MDC.MDCCloseable eventIdKey = MDC.putCloseable("eventId", event.eventId().toString())) {
+            event = reader.read(message.getBody());
+        } catch (InvalidEventException exception) {
+            // Aún no hay evento legible, por eso no hay sku ni eventId para el MDC.
+            reject(channel, deliveryTag, exception);
+            return;
+        }
+        try (MDC.MDCCloseable skuKey = MDC.putCloseable("sku", event.sku());
+                MDC.MDCCloseable eventIdKey = MDC.putCloseable("eventId", event.eventId().toString())) {
+            try {
                 if (applyWithRetries(event)) {
                     channel.basicAck(deliveryTag, false);
                 }
+            } catch (UnknownProductException exception) {
+                // Dentro del bloque MDC para que el WARN lleve sku y eventId.
+                reject(channel, deliveryTag, exception);
             }
-        } catch (InvalidEventException | UnknownProductException exception) {
-            LOGGER.warn("event_rejected reason={}", exception.getMessage());
-            channel.basicNack(deliveryTag, false, false);
         }
+    }
+
+    private void reject(Channel channel, long deliveryTag, RuntimeException exception) throws IOException {
+        LOGGER.warn("event_rejected reason={}", exception.getMessage());
+        channel.basicNack(deliveryTag, false, false);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.retail.catalog.stockevent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -165,7 +166,23 @@ class StockEventListenerTest {
     }
 
     @Test
-    void ifTheAcknowledgementFailsTheErrorPropagatesAndTheMessageIsNotLost() throws IOException {
+    void theMdcIsStillSetWhenAnUnknownSkuIsRejected() throws IOException {
+        List<String> seen = new ArrayList<>();
+        when(applyService.apply(EVENT)).thenThrow(new UnknownProductException("TENIS-RUNNER-42"));
+        doAnswer(invocation -> {
+            seen.add(MDC.get("sku") + "/" + MDC.get("eventId"));
+            return null;
+        }).when(channel).basicNack(DELIVERY_TAG, false, false);
+
+        listener.onMessage(message(BODY), channel);
+
+        assertThat(seen).containsExactly("TENIS-RUNNER-42/" + EVENT_ID);
+        assertThat(MDC.get("sku")).isNull();
+        assertThat(MDC.get("eventId")).isNull();
+    }
+
+    @Test
+    void ifTheAcknowledgementFailsTheErrorPropagatesAndTheMessageIsNotLost()throws IOException {
         when(applyService.apply(EVENT)).thenReturn(ApplyResult.APPLIED);
         doThrow(new IOException("channel closed")).when(channel).basicAck(DELIVERY_TAG, false);
 
