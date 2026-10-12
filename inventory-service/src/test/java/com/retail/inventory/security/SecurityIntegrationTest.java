@@ -31,6 +31,7 @@ import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.retail.inventory.support.PostgresIntegrationTest;
 import com.retail.inventory.support.TestTokens;
 
 /**
@@ -39,7 +40,7 @@ import com.retail.inventory.support.TestTokens;
 @SpringBootTest(properties = "inventory.jwt.secret=" + TestTokens.SECRET)
 @AutoConfigureMockMvc
 @Import(SecuredProbeController.class)
-class SecurityIntegrationTest {
+class SecurityIntegrationTest extends PostgresIntegrationTest {
 
     private static final String PROBLEM_TYPE_BASE = "https://api.retail-demo.local/problems/";
     private static final String SALES_PATH = "/api/v1/inventory/TENIS-RUNNER-42/sales";

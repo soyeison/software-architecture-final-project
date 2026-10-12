@@ -9,9 +9,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Controlador solo de pruebas con las rutas reales del contrato, mientras no existen sus
- * controladores (llegan en 4.3, 4.4 y 4.6, que lo eliminan). {@link TestComponent} lo excluye del
- * escaneo de {@code @SpringBootTest}; se importa explícitamente.
+ * Controlador solo de pruebas con las rutas del contrato que aún no tienen controlador real: la de
+ * venta llega en 4.4 y la del outbox en 4.6, que las eliminan (la de consulta de stock es real desde
+ * 4.3). {@link TestComponent} lo excluye del escaneo de {@code @SpringBootTest}; se importa
+ * explícitamente.
  */
 @TestComponent
 @RestController
@@ -26,10 +27,5 @@ class SecuredProbeController {
     @GetMapping("/api/v1/inventory/outbox")
     String listOutboxEvents() {
         return "outbox";
-    }
-
-    @GetMapping("/api/v1/inventory/{sku}")
-    String getStock(@PathVariable String sku) {
-        return "stock";
     }
 }

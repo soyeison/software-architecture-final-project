@@ -1,6 +1,16 @@
 spring:
   application:
     name: inventory-service
+  datasource:
+    # Valores para correr desde el IDE; Compose los sobrescribe con SPRING_DATASOURCE_*.
+    url: jdbc:postgresql://localhost:5441/inventory
+    username: inventory
+    password: inventory-demo
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway es el único dueño del esquema: una entidad desalineada impide el arranque.
+      ddl-auto: validate
 
 server:
   port: 8081

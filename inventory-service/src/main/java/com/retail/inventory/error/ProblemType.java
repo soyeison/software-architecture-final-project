@@ -29,6 +29,14 @@ public enum ProblemType {
         this.status = status;
     }
 
+    /**
+     * Tipo para los errores HTTP estándar de Spring MVC (405, 415, ...), que por defecto no traen
+     * {@code type}; el contrato lo exige.
+     */
+    public static URI genericHttpErrorType() {
+        return URI.create(TYPE_BASE_URI + "http-error");
+    }
+
     public HttpStatus status() {
         return status;
     }

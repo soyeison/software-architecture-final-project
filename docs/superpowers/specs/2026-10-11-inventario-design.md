@@ -114,6 +114,7 @@ Una clase de prueba en la sub-tarea 4.1 hace cumplir las reglas y falla si algui
   las traduce.
 - Un error inesperado responde `internal-error` sin detalles internos y se registra completo. Un
   JSON mal formado responde `validation-error` con `errors: []`.
+- Las excepciones estándar de Spring MVC (405, 415, ...) conservan su estado y reciben el tipo genérico `http-error`; los parámetros faltantes, de tipo incorrecto o que violan una restricción responden `validation-error` con `errors`.
 
 ### Logging
 
@@ -184,7 +185,7 @@ respuesta 401 del OpenAPI en esta sub-tarea (cambio compatible del contrato).
 - Matriz: sin token y token inválido → 401; sin el scope → 403; con el scope → pasa; token expirado
   y emisor incorrecto → 401; `outbox` público.
 - En 4.2 aún no hay endpoints reales: se usa un controlador de prueba solo en `src/test` con las
-  mismas rutas. Las sub-tareas 4.3 y 4.4 lo eliminan y mueven esas pruebas a los endpoints reales.
+  mismas rutas. La 4.3 retiró la ruta `GET /{sku}`, la 4.4 retirará la de `POST …/sales` y la 4.6 la de `GET /outbox`; las pruebas pasan a los endpoints reales.
 - Las pruebas del manejador de errores (de 4.1) desactivan los filtros de seguridad
   (`addFilters = false`): prueban solo el manejo de errores, y la seguridad se prueba aparte con su
   propia matriz.
@@ -229,7 +230,7 @@ patrón responde 404 porque no existe en la tabla, sin validación extra.
   - `GET /{sku}`: 200 con forma validada contra el contrato, 404 y 401/403;
   - **la semilla coincide con `docs/seed-data.md`**: una prueba lee la tabla del documento y la compara
     con lo sembrado, para evitar el desalineamiento entre Inventario y Catálogo.
-- Los tests que modifican stock usan **sus propios SKU** (`TEST-<uuid>`) y no tocan la semilla.
+- Los tests que modifican stock usan **sus propios SKU** (`TEST-<UUID en mayúsculas>`, para cumplir el patrón del contrato) y no tocan la semilla.
 
 ## 7. Venta y concurrencia (sub-tarea 4.4)
 
@@ -356,7 +357,7 @@ OutboxRelay (@Scheduled fixedDelay 500 ms)
 ### Pruebas: dos velocidades
 
 - `./mvnw test`: unitarias y prueba de arquitectura (segundos), el ciclo rápido de TDD.
-- `./mvnw verify`: además las de integración (`*IntegrationTest`, con `maven-failsafe-plugin`) contra
+- `./mvnw verify` (requiere Docker): además las de integración (`*IntegrationTest`, con `maven-failsafe-plugin`) contra
   PostgreSQL y RabbitMQ reales con Testcontainers, levantados una sola vez por ejecución.
 - Sin meta numérica de cobertura: cada comportamiento de las secciones 4 a 8 tiene al menos una prueba
   que lo demuestra.
@@ -405,10 +406,8 @@ sub-tarea responsable y su plan debe incluirlo.
 
 | Pendiente | Sub-tarea |
 |---|---|
-| Las excepciones estándar de Spring MVC (parámetro faltante, tipo incorrecto, `HandlerMethodValidationException`) responden `type: about:blank`; deben responder `validation-error` con `errors`, y la prueba del 405 debe validar el schema `Problem` | 4.3 |
-| Retirar `allowEmptyShould(true)` de la regla 3 (controladores sin repositorios) de ArchUnit | 4.3 |
-| Retirar `allowEmptyShould(true)` de la regla 4 (`stock/` y `sale/` independientes de web y mensajería) | 4.4 |
 | `validation-error` con `message` nulo o con violaciones de clase (no solo de campo) | 4.4 |
+| `SeedDataIntegrationTest` asume que ninguna prueba modifica los SKU sembrados: toda prueba que envíe una venta (la matriz de seguridad incluida) debe usar un SKU creado con `TestStocks.insert`. Afecta a `GenerateTokenScriptIntegrationTest.posAndOnlineTokensCanSell` y a `SecurityIntegrationTest.saleWithSellScopeIsAllowed`, que venden `TENIS-RUNNER-42` y bajarán la semilla cuando `SaleController` reemplace la sonda | 4.4 |
 | El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
 | El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
 | Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |

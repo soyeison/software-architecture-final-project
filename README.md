@@ -73,12 +73,14 @@ Código en `inventory-service/` (Java 25, Spring Boot 4, Maven wrapper). Diseño
 ```bash
 cd inventory-service
 ./mvnw test     # pruebas unitarias y de arquitectura (rápidas)
-./mvnw verify   # además, las pruebas de integración (*IntegrationTest)
+./mvnw verify   # además, las pruebas de integración (*IntegrationTest); requieren Docker (PostgreSQL con Testcontainers)
 ```
 
 Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su contenedor
 (`docker compose stop inventory-service`) y definir `JWT_SECRET` con al menos 32 bytes, por ejemplo
 el valor de `.env.example`. Sin `JWT_SECRET` válido el servicio no arranca, a propósito.
+
+El servicio usa la base de Inventario: al correrlo fuera de Compose, levantar antes `docker compose up -d --wait inventory-db` (puerto 5441). Flyway crea la tabla `stock` y la siembra al arrancar.
 
 Tokens de demo (bash y openssl, sin dependencias): `scripts/generate-token.sh pos` u `online` para
 vender, `operator` para consultar el stock y `no-scope` para probar el 403. El script toma
@@ -89,6 +91,8 @@ configurar nada.
 TOKEN="$(scripts/generate-token.sh operator)"
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/inventory/TENIS-RUNNER-42
 ```
+
+Responde `200` con `{"sku":"TENIS-RUNNER-42","stock":5,"version":1,...}`. Un SKU inexistente responde `404 not-found`.
 
 Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
 qué rutas existen. `/v3/api-docs` también se deniega; el contrato publicado es el de Swagger UI.
