@@ -165,6 +165,23 @@ Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su cont
 (`docker compose stop catalog-service`) y levantar su base (`docker compose up -d --wait catalog-db`,
 puerto 5442). `./mvnw verify` requiere Docker (PostgreSQL con Testcontainers).
 
+## Escenarios E2E
+
+Los escenarios de la [spec global](docs/superpowers/specs/2026-10-12-e2e-design.md) se prueban contra el
+stack de desarrollo con los puertos por defecto. Requieren Docker, `curl` y `jq`.
+
+```bash
+docker compose up -d --wait   # el stack debe estar levantado
+e2e/01-pos-sale.sh            # un escenario suelto; --demo narra paso a paso y espera Enter
+e2e/selftest.sh               # prueba de la lógica de e2e/lib.sh (sin Docker)
+e2e/reset.sh                  # DESTRUCTIVO: down -v + up --build, estado inicial conocido
+```
+
+Por ahora están los escenarios 01 (venta POS), 02 (venta online), 03 (carrera por la última unidad), 04
+(venta sin stock) y 10 (seguridad). Cada uno usa su SKU de `docs/seed-data.md` y compara contra el estado
+actual; el 03 necesita stock exactamente 1 y solo corre una vez por reinicio, y los demás se pueden repetir.
+Variables opcionales: `INVENTORY_URL`, `CATALOG_URL` y `WAIT_TIMEOUT_SECONDS`.
+
 ## Verificación
 
 Requiere Docker; la verificación de la infraestructura también necesita `curl` y `jq`.

@@ -35,6 +35,7 @@ servicio), JWT, Docker Compose.
   infraestructura (ambos requieren Docker; `verify-infra.sh` también necesita curl y jq).
 - `scripts/smoke-inventory-service.sh` prueba de humo de Inventario dentro de Compose (requiere Docker, curl y jq).
 - `scripts/smoke-catalog-service.sh` prueba de humo del flujo venta → Catálogo dentro de Compose (requiere Docker, curl y jq).
+- `e2e/<escenario>.sh` ejecuta un escenario E2E contra el stack de desarrollo (`--demo` narra paso a paso); `e2e/selftest.sh` prueba `e2e/lib.sh` sin Docker; `e2e/reset.sh` reinicia el stack (destructivo, borra los datos).
 - Datos semilla de referencia: `docs/seed-data.md`.
 - `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
   integración; requiere Docker). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
