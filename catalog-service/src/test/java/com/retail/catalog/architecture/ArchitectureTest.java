@@ -9,9 +9,8 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
- * Hace cumplir las reglas de dependencia de la spec del Catálogo (sección 3). Las reglas 3 y 4 describen
- * paquetes que llegan en la sub-tarea 5.2 y por eso permiten evaluación vacía hasta entonces; la 5.2
- * retira ese permiso. Las reglas 1 y 2 ya evalúan clases reales.
+ * Hace cumplir las reglas de dependencia de la spec del Catálogo (sección 3). Ninguna regla permite
+ * evaluación vacía: si un paquete deja de tener clases que evaluar, la prueba falla.
  */
 @AnalyzeClasses(packages = "com.retail.catalog", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
@@ -29,12 +28,10 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule controllersDoNotUseRepositories = noClasses()
             .that().haveSimpleNameEndingWith("Controller")
-            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
-            .allowEmptyShould(true);
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository");
 
     @ArchTest
     static final ArchRule productDoesNotDependOnStockEvent = noClasses()
             .that().resideInAPackage("com.retail.catalog.product..")
-            .should().dependOnClassesThat().resideInAPackage("com.retail.catalog.stockevent..")
-            .allowEmptyShould(true);
+            .should().dependOnClassesThat().resideInAPackage("com.retail.catalog.stockevent..");
 }

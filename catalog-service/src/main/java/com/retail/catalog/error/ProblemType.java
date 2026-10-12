@@ -4,6 +4,7 @@ import java.net.URI;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Tipos de problema (RFC 9457) del contrato. Es el único lugar donde se definen sus códigos, títulos
@@ -34,12 +35,26 @@ public enum ProblemType {
         return URI.create(TYPE_BASE_URI + "http-error");
     }
 
+    /**
+     * {@code instance} es un URI, pero la ruta de la petición puede traer caracteres que {@code URI.create}
+     * rechaza (p. ej., {@code [} o {@code {}): en ese caso se codifica en lugar de fallar dentro del manejador de
+     * errores. Se codifica sobre el componente ya construido ({@code build().encode()}), porque el
+     * {@code encode()} del constructor interpreta las llaves como variables de plantilla.
+     */
+    static URI toInstance(String requestPath) {
+        try {
+            return URI.create(requestPath);
+        } catch (IllegalArgumentException exception) {
+            return UriComponentsBuilder.fromPath(requestPath).build().encode().toUri();
+        }
+    }
+
     /** Crea el {@link ProblemDetail} de este tipo con el detalle y la ruta que lo originó. */
     public ProblemDetail toProblemDetail(String detail, String requestPath) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setType(URI.create(TYPE_BASE_URI + code));
         problem.setTitle(title);
-        problem.setInstance(URI.create(requestPath));
+        problem.setInstance(toInstance(requestPath));
         return problem;
     }
 }
