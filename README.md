@@ -148,6 +148,10 @@ Es el consumidor del flujo: mantiene la vista de disponibilidad con los eventos 
 expone por REST sin token. La consulta ya está disponible (el consumidor de eventos llega en las
 siguientes sub-tareas): la base `catalog-db` se siembra con los 7 productos de `docs/seed-data.md`.
 
+La aplicación de eventos (deduplicación por `eventId`, descarte de versiones viejas y cálculo de la latencia)
+ya está implementada y probada contra PostgreSQL, pero todavía no se alimenta de RabbitMQ: el consumidor
+llega en la siguiente sub-tarea.
+
 ```bash
 curl http://localhost:8082/api/v1/catalog/products                    # todos, ordenados por SKU
 curl http://localhost:8082/api/v1/catalog/products/TENIS-RUNNER-42    # uno (404 si no existe)

@@ -54,7 +54,8 @@ com.retail.catalog
 ├── error/        GlobalExceptionHandler, ProblemType
 ├── product/      Product, ProductRepository, ProductQueryService, ProductController,
 │                 ProductResponse, ProductNotFoundException
-└── stockevent/   StockChangedEvent, StockEventListener, ApplyStockChangeService, ApplyResult,
+└── stockevent/   StockChangedEvent, StockEventReader, StockEventListener, ApplyStockChangeService,
+                  ApplyResult,
                   ProcessedEvent, ProcessedEventRepository,
                   InvalidEventException, UnknownProductException
 ```
@@ -187,6 +188,9 @@ el segundo intento lo encuentra y responde `DUPLICATE`.
 consumidor; el REST no recibe cuerpos). Se valida lo que el Catálogo necesita: `eventId` UUID válido,
 `sku` no vacío, `newStock` ≥ 0, `stockVersion` ≥ 1 y `occurredAt` interpretable como instante UTC. Cualquier
 incumplimiento, o un JSON corrupto, es `InvalidEventException` (permanente).
+La lectura la hace `StockEventReader` (recibe los bytes del cuerpo, usa Jackson y Bean Validation y no
+conoce RabbitMQ); el `record` lleva `@JsonIgnoreProperties(ignoreUnknown = true)`, de modo que la
+tolerancia no depende de la configuración global de Jackson. `channel` es informativo y no se valida.
 
 ### Listener (`StockEventListener`)
 
@@ -233,7 +237,8 @@ del `content_type`). Clasifica cada fallo según su causa:
   PostgreSQL y RabbitMQ reales (Testcontainers; RabbitMQ carga `infra/rabbitmq/definitions.json`).
 - Una base de pruebas compartida por ejecución (`PostgresIntegrationTest`) y otra con RabbitMQ
   (`RabbitIntegrationTest`), como en Inventario. Las clases que dependen de filas ajenas las vacían
-  (`TRUNCATE`) en `@BeforeEach`; un contexto con el listener activo que no deba sobrevivir a su clase usa
+  (`TRUNCATE`) en `@BeforeEach` (cada clase vacía solo la tabla que le corresponde, por ejemplo
+  `processed_events`, nunca `products` ni los SKU sembrados; ver la regla de 5.3 y 5.4); un contexto con el listener activo que no deba sobrevivir a su clase usa
   `@DirtiesContext`.
 - Las pruebas de integración de 5.3 y 5.4 usan productos `TEST-<UUID>` y solo vacían `processed_events`
   (`TRUNCATE`); nunca vacían `products` ni modifican los SKU sembrados, porque `SeedDataIntegrationTest` y
@@ -255,8 +260,11 @@ escenario 9 (versión 3 antes que 2 deja la 3); JSON corrupto, campo faltante y 
 en la DLQ; un error transitorio simulado reintenta y luego confirma; un campo extra en el evento se
 tolera.
 
-**Contrato del evento:** el Catálogo lee los ejemplos de `docs/contracts/events/`: acepta `valid.json`,
-tolera un campo extra y rechaza los inválidos.
+**Contrato del evento:** el Catálogo lee los ejemplos de `docs/contracts/events/`: acepta `valid.json`;
+tolera `invalid-extra-field.json` (propiedad desconocida) y también `invalid-unknown-channel.json` e
+`invalid-missing-millis.json` (el Catálogo no usa el canal ni exige milisegundos: tolerancia deliberada
+del consumidor); y rechaza `invalid-negative-stock.json`, `invalid-missing-field.json`,
+`invalid-zero-version.json` y el JSON truncado.
 
 ### Una sola fuente de verdad para los archivos de contrato
 
@@ -289,7 +297,7 @@ RabbitMQ. Nunca hay una copia a mano en el repositorio.
 |---|---|---|---|
 | **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, Dockerfile sin root, `.dockerignore`, `CATALOG_SERVICE_PORT` y prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
 | **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}`; el contrato publicado es el de Swagger UI y `/v3/api-docs` es solo informativo (aclarado en el README); reglas 3 y 4 de ArchUnit sin evaluación vacía | Respuesta contra el contrato; semilla igual al documento | consulta |
-| **5.3** | `ApplyStockChangeService`, `ProcessedEvent`, evento tolerante y validado | PostgreSQL real: aplicar, duplicado, viejo, SKU desconocido, atomicidad | 9 (a nivel de servicio) |
+| **5.3** | `StockEventReader`, `ApplyStockChangeService`, `ProcessedEvent`, evento tolerante y validado | PostgreSQL real: aplicar, duplicado, viejo, SKU desconocido, atomicidad | 9 (a nivel de servicio) |
 | **5.4** | `CatalogProperties` (primeras propiedades reales: espera del reintento y nombre de la cola), salud sin RabbitMQ, listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
 
 **Dependencias por sub-tarea:** cada una agrega solo las que necesita (5.1: web, validación, actuator,
