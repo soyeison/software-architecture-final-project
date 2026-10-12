@@ -165,6 +165,27 @@ Para correrlo desde el IDE o con `./mvnw spring-boot:run`, detener antes su cont
 (`docker compose stop catalog-service`) y levantar su base (`docker compose up -d --wait catalog-db`,
 puerto 5442). `./mvnw verify` requiere Docker (PostgreSQL con Testcontainers).
 
+## Escenarios E2E
+
+Los escenarios de la [spec global](docs/superpowers/specs/2026-10-09-solucion-global-design.md) (§4.2) se
+implementan según la [spec E2E](docs/superpowers/specs/2026-10-12-e2e-design.md) y se prueban contra el
+stack de desarrollo con los puertos por defecto. Requieren Docker, `curl` y `jq`, además de bash 5 y GNU
+`date` (no funcionan con bash 3.2 ni en macOS).
+
+```bash
+docker compose up -d --wait   # el stack debe estar levantado
+e2e/01-pos-sale.sh            # un escenario suelto; --demo narra paso a paso y espera Enter
+e2e/selftest.sh               # prueba de la lógica de e2e/lib.sh (sin Docker)
+e2e/reset.sh                  # DESTRUCTIVO: down -v + up --build, estado inicial conocido
+```
+
+Por ahora están los escenarios 01 (venta POS), 02 (venta online), 03 (carrera por la última unidad), 04
+(venta sin stock) y 10 (seguridad). Cada uno usa su SKU de `docs/seed-data.md` y compara contra el estado
+actual; el 03 necesita stock exactamente 1 y solo corre una vez por reinicio; el 01 y el 02 consumen una unidad de
+TENIS-RUNNER-42 (stock sembrado 5), así que tras unas 5 ventas hace falta `e2e/reset.sh`; solo el 04 y el
+10 se repiten sin límite.
+Variables opcionales: `INVENTORY_URL`, `CATALOG_URL` y `WAIT_TIMEOUT_SECONDS`.
+
 ## Verificación
 
 Requiere Docker; la verificación de la infraestructura también necesita `curl` y `jq`.
