@@ -38,4 +38,22 @@ class ContractAssertionsTest {
         assertThatThrownBy(() -> ContractAssertions.assertMatchesSchema(validationProblemWithoutErrors,
                 "ValidationProblem")).isInstanceOf(AssertionError.class);
     }
+
+    @Test
+    void acceptsTheContractExampleOfTheEvent() throws Exception {
+        String valid = new String(getClass().getResourceAsStream("/contracts/events/examples/valid.json")
+                .readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+
+        assertThatCode(() -> ContractAssertions.assertMatchesEventSchema(valid)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsEventWithoutMilliseconds() throws Exception {
+        String invalid = new String(getClass()
+                .getResourceAsStream("/contracts/events/examples/invalid-missing-millis.json").readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> ContractAssertions.assertMatchesEventSchema(invalid))
+                .isInstanceOf(AssertionError.class);
+    }
 }
