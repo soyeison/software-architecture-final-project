@@ -196,7 +196,10 @@ publish_raw() {
 # LAST_EVENT_ID (nuevo si no se indica). Devuelve 0 si el broker lo enruta.
 publish_event() {
   LAST_EVENT_ID="${4:-$(new_uuid)}"
-  publish_raw "$(build_event "$LAST_EVENT_ID" "$1" "$2" "$3" "${5:-POS}")"
+  local body
+  # Si el evento no se puede construir (stock o versión no numéricos) no se publica nada.
+  body="$(build_event "$LAST_EVENT_ID" "$1" "$2" "$3" "${5:-POS}")" || return 1
+  publish_raw "$body"
 }
 
 # catalog_log_count <patrón>: líneas del log del Catálogo que contienen el patrón (texto literal).

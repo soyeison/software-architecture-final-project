@@ -20,7 +20,7 @@ publish_raw '{ esto no es json'
 check "el broker enruta el mensaje corrupto" "$?" "0"
 
 step "Inyecta un evento sin el campo obligatorio newStock"
-publish_raw "$(build_event "$(new_uuid)" "$SKU" 1 "$base" | jq -c 'del(.newStock)')"
+publish_raw "$(build_event "$(new_uuid)" "$SKU" 1 1 | jq -c 'del(.newStock)')"
 check "el broker enruta el evento incompleto" "$?" "0"
 
 step "Inyecta un evento de un SKU que el Catálogo no conoce"

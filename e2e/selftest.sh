@@ -117,6 +117,18 @@ expect "catalog_log_count: cuenta las líneas con el patrón" \
 expect "catalog_log_count: el patrón es texto literal (a.b no coincide con axb)" \
   "$(compose() { printf 'axb\na.b\n'; }; catalog_log_count 'a.b')" "1"
 
+# --- publish_event con `publish_raw` simulado ---
+# La función simulada imprime "llamada" (y el cuerpo) para detectar si se la invocó.
+invalid_stock_result="$(publish_raw() { echo "llamada: $1"; }; publish_event X abc 1 && echo "codigo=0" || echo "codigo=1")"
+expect "publish_event: stock no numérico devuelve 1 sin publicar" "$invalid_stock_result" "codigo=1"
+invalid_version_result="$(publish_raw() { echo "llamada: $1"; }; publish_event X 1 abc && echo "codigo=0" || echo "codigo=1")"
+expect "publish_event: versión no numérica devuelve 1 sin publicar" "$invalid_version_result" "codigo=1"
+valid_result="$(publish_raw() { echo "llamada"; echo "$1" | jq -r '.sku'; return 0; }; publish_event X 1 2 "$identifier"; echo "codigo=$?")"
+expect "publish_event: con valores válidos publica un cuerpo JSON y devuelve 0" \
+  "$valid_result" $'llamada\nX\ncodigo=0'
+failing_publish_code="$(publish_raw() { return 1; }; publish_event X 1 2 >/dev/null; echo "$?")"
+expect "publish_event: propaga el código de salida de publish_raw" "$failing_publish_code" "1"
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1
