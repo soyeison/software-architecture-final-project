@@ -170,6 +170,27 @@ expect "start_service: si compose falla devuelve 1 y conserva el registro" \
   "$(registry_state failing_start | paste -sd' ')" "estado=1 registro=[rabbitmq]"
 rm -f "$calls_file"
 
+# restore_services debe avisar por el stderr original aunque se ejecute dentro de `>/dev/null 2>&1`
+# (como pasa cuando la señal llega durante un predicado de wait_until).
+restore_messages_file="$(mktemp)"
+restore_under_redirect() { # restore_under_redirect <estado de compose>
+  ( compose() { return "$1"; }
+    STOPPED_SERVICES=(rabbitmq)
+    install_restore_trap 2>"$restore_messages_file"
+    trap - EXIT INT TERM
+    restore_services >/dev/null 2>&1
+    echo "registro=[${STOPPED_SERVICES[*]}]" ) 2>>"$restore_messages_file"
+}
+: >"$restore_messages_file"
+restore_under_redirect 0 >/dev/null
+expect "restore_services: el aviso 'Restaurando' llega al stderr original aunque esté redirigido" \
+  "$(grep -c '^Restaurando rabbitmq' "$restore_messages_file")" "1"
+: >"$restore_messages_file"
+expect "restore_services: si compose falla conserva el registro" "$(restore_under_redirect 1)" "registro=[rabbitmq]"
+expect "restore_services: el aviso FAIL llega al stderr original" \
+  "$(grep -c '^FAIL: no se pudo restaurar rabbitmq' "$restore_messages_file")" "1"
+rm -f "$restore_messages_file"
+
 queue_consumers_with() { # queue_consumers_with <consumidores> <comando...>: simula rabbitmqctl list_queues name consumers
   ( simulated_consumers="$1"
     compose() { printf 'catalog.inventory-stock-changed\t%s\r\nother.queue\t5\n' "$simulated_consumers"; }

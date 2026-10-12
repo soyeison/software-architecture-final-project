@@ -36,10 +36,11 @@ step "Reinicia el Catálogo"
 restart_ms="$(now_ms)"
 start_service catalog-service
 check "el Catálogo vuelve a estar sano" "$?" "0"
-wait_until "el Catálogo converge a stock $((before - SALES))" catalog_stock_is "$SKU" "$((before - SALES))"
-catch_up_ms=$(( $(now_ms) - restart_ms ))
-metric catalog_catch_up_ms "$catch_up_ms"
-echo "INFO: puesta al día del Catálogo: ${catch_up_ms} ms (incluye el arranque del servicio)"
+if wait_until "el Catálogo converge a stock $((before - SALES))" catalog_stock_is "$SKU" "$((before - SALES))"; then
+  catch_up_ms=$(( $(now_ms) - restart_ms ))
+  metric catalog_catch_up_ms "$catch_up_ms"
+  echo "INFO: puesta al día del Catálogo: ${catch_up_ms} ms (incluye el arranque del servicio)"
+fi
 
 step "Comprobando que no se perdió ni se reordenó nada"
 check "los eventos se aplicaron en el orden de las ventas" \

@@ -248,17 +248,23 @@ start_service() {
 }
 
 # restore_services: levanta todo lo que el escenario dejó detenido. Se usa como trap de salida.
+# Ignora INT y TERM mientras restaura (una segunda señal no debe cortar la restauración; compose hereda el
+# "ignorado") y escribe sus avisos por el stderr original guardado en install_restore_trap (el trap puede
+# ejecutarse dentro de la redirección `>/dev/null 2>&1` de un predicado de wait_until).
 restore_services() {
+  trap '' INT TERM
   local pending=("${STOPPED_SERVICES[@]}") service
+  local messages="${E2E_STDERR:-2}"
   for service in "${pending[@]}"; do
-    echo "Restaurando $service..." >&2
-    start_service "$service" || echo "FAIL: no se pudo restaurar $service; ejecuta e2e/reset.sh" >&2
+    echo "Restaurando $service..." >&"$messages"
+    start_service "$service" || echo "FAIL: no se pudo restaurar $service; ejecuta e2e/reset.sh" >&"$messages"
   done
 }
 
 # install_restore_trap: garantiza que los servicios detenidos se levanten aunque el escenario falle o se
 # interrumpa (Ctrl+C o señal de terminación).
 install_restore_trap() {
+  exec {E2E_STDERR}>&2
   trap restore_services EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM

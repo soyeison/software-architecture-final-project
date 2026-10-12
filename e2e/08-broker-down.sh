@@ -9,7 +9,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 e2e_init "$@"
 SKU="BOTELLA-TERMICA-750"
 SALES=2
-# La reconexión de los servicios tras volver el broker puede tardar (se observaron ~10 s y hasta ~25 s).
+# La reconexión de los servicios tras volver el broker puede tardar (medido ~6 s; se observaron hasta ~25 s en otra ocasión).
 RECOVERY_TIMEOUT_SECONDS=90
 
 require_stack
@@ -41,15 +41,20 @@ step "Reinicia RabbitMQ"
 restart_ms="$(now_ms)"
 start_service rabbitmq
 check "RabbitMQ vuelve a estar sano" "$?" "0"
-WAIT_TIMEOUT_SECONDS="$RECOVERY_TIMEOUT_SECONDS" wait_until "el outbox publica los $SALES eventos (PUBLISHED)" \
-  outbox_count_with_status_is PUBLISHED "$SALES" "${sale_ids[@]}"
-drain_ms=$(( $(now_ms) - restart_ms ))
-WAIT_TIMEOUT_SECONDS="$RECOVERY_TIMEOUT_SECONDS" wait_until "el Catálogo converge a stock $((before - SALES))" \
-  catalog_stock_is "$SKU" "$((before - SALES))"
-catch_up_ms=$(( $(now_ms) - restart_ms ))
-metric outbox_drain_ms "$drain_ms"
-metric broker_recovery_catch_up_ms "$catch_up_ms"
-echo "INFO: outbox vaciado ${drain_ms} ms y Catálogo al día ${catch_up_ms} ms después de reiniciar RabbitMQ"
+drain_ms=""
+if WAIT_TIMEOUT_SECONDS="$RECOVERY_TIMEOUT_SECONDS" wait_until "el outbox publica los $SALES eventos (PUBLISHED)" \
+  outbox_count_with_status_is PUBLISHED "$SALES" "${sale_ids[@]}"; then
+  drain_ms=$(( $(now_ms) - restart_ms ))
+fi
+if WAIT_TIMEOUT_SECONDS="$RECOVERY_TIMEOUT_SECONDS" wait_until "el Catálogo converge a stock $((before - SALES))" \
+  catalog_stock_is "$SKU" "$((before - SALES))"; then
+  catch_up_ms=$(( $(now_ms) - restart_ms ))
+  if [[ -n "$drain_ms" ]]; then
+    metric outbox_drain_ms "$drain_ms"
+    metric broker_recovery_catch_up_ms "$catch_up_ms"
+    echo "INFO: outbox vaciado ${drain_ms} ms y Catálogo al día ${catch_up_ms} ms después de reiniciar RabbitMQ"
+  fi
+fi
 
 step "Comprobando que no se perdió ningún evento"
 check "no quedan eventos PENDING de estas ventas" "$(outbox_count_with_status PENDING "${sale_ids[@]}")" "0"
