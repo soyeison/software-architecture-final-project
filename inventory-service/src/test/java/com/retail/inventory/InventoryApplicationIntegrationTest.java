@@ -20,10 +20,12 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.retail.inventory.support.PostgresIntegrationTest;
+
 @SpringBootTest(properties = "inventory.jwt.secret=integration-test-secret-of-32-bytes!")
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-class InventoryApplicationIntegrationTest {
+class InventoryApplicationIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

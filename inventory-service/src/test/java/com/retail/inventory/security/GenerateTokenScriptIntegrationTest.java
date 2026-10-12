@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.retail.inventory.support.PostgresIntegrationTest;
 import com.retail.inventory.support.TestTokens;
 
 /**
@@ -30,7 +31,7 @@ import com.retail.inventory.support.TestTokens;
 @SpringBootTest(properties = "inventory.jwt.secret=" + TestTokens.SECRET)
 @AutoConfigureMockMvc
 @Import(SecuredProbeController.class)
-class GenerateTokenScriptIntegrationTest {
+class GenerateTokenScriptIntegrationTest extends PostgresIntegrationTest {
 
     /** Maven ejecuta las pruebas desde inventory-service/; el script vive en la raíz del repositorio. */
     private static final Path SCRIPT = Path.of("..", "scripts", "generate-token.sh");
