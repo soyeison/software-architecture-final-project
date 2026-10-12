@@ -44,19 +44,19 @@ check "el contenedor del Catálogo no corre como root" "$([[ "$container_user" =
 check "el Catálogo tiene un consumidor en la cola $QUEUE" "$(queue_field "$QUEUE" consumers)" "1"
 
 echo "== Estado inicial =="
-stock_before="$(curl -s "$CATALOG_URL/api/v1/catalog/products/$SKU" | jq -r '.availableStock')"
+stock_before="$(curl -s --max-time 10 "$CATALOG_URL/api/v1/catalog/products/$SKU" | jq -r '.availableStock')"
 check "el Catálogo sirve $SKU con la semilla" "$stock_before" "5"
 
 echo "== Venta =="
 token="$("$ROOT/scripts/generate-token.sh" pos)"
-http_status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$INVENTORY_URL/api/v1/inventory/$SKU/sales" \
+http_status="$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' -X POST "$INVENTORY_URL/api/v1/inventory/$SKU/sales" \
   -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"quantity":1,"channel":"POS"}')"
 check "la venta responde 201" "$http_status" "201"
 
 echo "== Propagación al Catálogo =="
 stock_after="$stock_before"; latency="null"
 for _ in $(seq 1 30); do
-  product="$(curl -s "$CATALOG_URL/api/v1/catalog/products/$SKU")"
+  product="$(curl -s --max-time 10 "$CATALOG_URL/api/v1/catalog/products/$SKU")"
   stock_after="$(jq -r '.availableStock' <<<"$product")"
   latency="$(jq -r '.lastEventLatencyMs' <<<"$product")"
   [[ "$stock_after" == "$((stock_before - 1))" ]] && break

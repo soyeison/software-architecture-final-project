@@ -69,7 +69,7 @@ public class StockEventListener {
                 if (applyWithRetries(event)) {
                     channel.basicAck(deliveryTag, false);
                 }
-            } catch (UnknownProductException exception) {
+            } catch (InvalidEventException | UnknownProductException exception) {
                 // Dentro del bloque MDC para que el WARN lleve sku y eventId.
                 reject(channel, deliveryTag, exception);
             }

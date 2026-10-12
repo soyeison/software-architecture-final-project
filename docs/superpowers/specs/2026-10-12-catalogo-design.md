@@ -76,7 +76,7 @@ Las reglas 3 y 4 permiten evaluación vacía en 5.1 (no hay clases que evaluar) 
 ### Configuración
 
 - `CatalogProperties` (`@ConfigurationProperties`, validada) agrupa lo propio del servicio:
-  `catalog.consumer.queue` (por defecto `catalog.inventory-stock-changed`),
+  `catalog.consumer.queue` (su valor, `catalog.inventory-stock-changed`, vive en `application.yml`; sin él el servicio no arranca),
   `catalog.consumer.initial-backoff` (1 s) y `catalog.consumer.maximum-backoff` (30 s). Lo demás
   (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring. `CatalogProperties` se valida al arrancar (cola no vacía, esperas positivas y tope no menor que la espera inicial) y sus valores viven en `application.yml`.
 - Los valores por defecto de `application.yml` apuntan a `localhost` (puertos 5442 y 5672), de modo

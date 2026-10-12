@@ -106,6 +106,17 @@ class StockEventListenerTest {
     }
 
     @Test
+    void anInvalidEventRaisedByTheServiceIsRejectedWithoutRequeueAndWithoutRetrying() throws IOException {
+        when(applyService.apply(EVENT)).thenThrow(new InvalidEventException("rejected by the service"));
+
+        listener.onMessage(message(BODY), channel);
+
+        verify(applyService, times(1)).apply(EVENT);
+        verify(channel).basicNack(DELIVERY_TAG, false, false);
+        verify(channel, never()).basicAck(any(Long.class), any(Boolean.class));
+    }
+
+    @Test
     void aTransientFailureIsRetriedUntilItSucceedsAndOnlyThenAcknowledged() throws IOException {
         when(applyService.apply(EVENT))
                 .thenThrow(new IllegalStateException("database down"))
@@ -182,7 +193,7 @@ class StockEventListenerTest {
     }
 
     @Test
-    void ifTheAcknowledgementFailsTheErrorPropagatesAndTheMessageIsNotLost()throws IOException {
+    void ifTheAcknowledgementFailsTheErrorPropagatesAndTheMessageIsNotLost() throws IOException {
         when(applyService.apply(EVENT)).thenReturn(ApplyResult.APPLIED);
         doThrow(new IOException("channel closed")).when(channel).basicAck(DELIVERY_TAG, false);
 

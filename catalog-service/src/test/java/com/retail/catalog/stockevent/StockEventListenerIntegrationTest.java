@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -23,13 +25,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessageListenerContainer;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.core.MessageListenerContainer;
-import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -240,7 +242,7 @@ class StockEventListenerIntegrationTest extends RabbitIntegrationTest {
         assertThat(queueDepth(QUEUE)).isZero();
         assertThat(stored().getStockVersion()).isZero();
         assertThat(processedEventRepository.existsById(unknownSkuEventId)).isFalse();
-        java.util.List<String> bodies = new java.util.ArrayList<>();
+        List<String> bodies = new ArrayList<>();
         for (int index = 0; index < 3; index++) {
             Message message = rabbitTemplate.receive(DEAD_LETTER_QUEUE, 5000);
             assertThat(message).isNotNull();
