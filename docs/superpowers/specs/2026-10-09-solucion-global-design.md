@@ -209,7 +209,7 @@ documento como evidencia.
 
 - **Latencia de propagación:** `updatedAt − occurredAt` por evento. Los contenedores comparten
   el reloj del equipo anfitrión.
-- **Medición:** `e2e/measure-latency.sh` ejecuta N ventas (20 por defecto) alternando POS y
+- **Medición:** `e2e/11-latency.sh` ejecuta N ventas (20 por defecto) alternando POS y
   online, calcula mínimo, promedio, p95 y máximo, y escribe `docs/results/latency.md`.
 - **Valor esperado:** menos de 1 segundo, dominado por el intervalo del publicador del outbox.
 - **Comparación con el "antes":**

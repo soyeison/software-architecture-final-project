@@ -185,7 +185,10 @@ Están los 11 escenarios: 01 (venta POS), 02 (venta online), 03 (carrera por la 
 09 (eventos fuera de orden), 10 (seguridad) y 11 (latencia). `e2e/run-all.sh` los ejecuta todos en secuencia
 (cada uno como subproceso, y continúa tras un fallo) y resume PASS/FAIL con las duraciones y las métricas;
 `--report <archivo>` guarda ese resumen en Markdown. Sin `--reset` solo sirve si el stack está recién
-reiniciado: una segunda ejecución falla porque el stock se agota. El escenario 11 genera
+reiniciado: una segunda ejecución falla solo en el 03 (BALON-FUTBOL-5 con stock 0; necesita exactamente 1) y en
+el 07 (TENIS-RUNNER-42 agotado), los otros 9 pasan, y el 05 y el 08 sí detienen y restauran contenedores; el 11
+pasa en la segunda ejecución y falla en la tercera (GORRA-SPORT-NEGRA tiene 50 y consume 20). Ctrl+C durante
+una ejecución restaura el contenedor detenido, no sigue con el siguiente escenario y sale con 130. El escenario 11 genera
 `docs/results/latency.md` (mínimo, promedio, p95 y máximo de 20 ventas, que falla si el p95 supera 1000 ms) y
 admite las variables `LATENCY_SALES`, `LATENCY_P95_LIMIT_MS` y `LATENCY_REPORT`; consume 20 unidades de
 GORRA-SPORT-NEGRA (2 ejecuciones por reinicio). Cada escenario usa su SKU de `docs/seed-data.md` y compara contra el estado actual. El 03 necesita
