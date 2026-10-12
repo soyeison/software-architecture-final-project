@@ -106,6 +106,11 @@ class StockEventListenerIntegrationTest extends RabbitIntegrationTest {
         startBroker();
         reset(applyService);
         container().start();
+        // Que no quede ningun residual (en cola o en vuelo) que llegue a la DLQ en la prueba siguiente.
+        await().atMost(PATIENCE).ignoreExceptions().untilAsserted(() -> assertThat(queueDepth(QUEUE)).isZero());
+        // Detener el contenedor espera a los hilos en curso; lo no confirmado volveria a la cola.
+        container().stop();
+        await().atMost(PATIENCE).ignoreExceptions().untilAsserted(() -> assertThat(queueDepth(QUEUE)).isZero());
         productRepository.deleteById(sku);
     }
 
@@ -203,16 +208,19 @@ class StockEventListenerIntegrationTest extends RabbitIntegrationTest {
         assertThat(queueDepth(DEAD_LETTER_QUEUE)).isZero();
     }
 
+    /** El segundo mensaje es distinto pero repite el eventId: se descarta por eventId, no por la guarda de versión. */
     @Test
-    void aDuplicatedMessageIsAppliedOnlyOnce() {
-        String body = eventJson(UUID.randomUUID(), sku, 3, 1, "");
+    void aMessageWithAnAlreadyProcessedEventIdIsDiscardedByEventIdAndNotByVersion() {
+        UUID eventId = UUID.randomUUID();
+        publish(eventJson(eventId, sku, 3, 2, ""));
+        await().atMost(PATIENCE).untilAsserted(() -> assertThat(stored().getStockVersion()).isEqualTo(2L));
 
-        publish(body);
-        publish(body);
+        publish(eventJson(eventId, sku, 1, 3, ""));
 
         await().atMost(PATIENCE).untilAsserted(() -> verify(applyService, times(2)).apply(any()));
         await().atMost(PATIENCE).untilAsserted(() -> assertThat(queueDepth(QUEUE)).isZero());
         assertThat(stored().getAvailableStock()).isEqualTo(3);
+        assertThat(stored().getStockVersion()).isEqualTo(2L);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM processed_events", Integer.class)).isEqualTo(1);
         assertThat(queueDepth(DEAD_LETTER_QUEUE)).isZero();
     }
@@ -220,17 +228,25 @@ class StockEventListenerIntegrationTest extends RabbitIntegrationTest {
     @Test
     void messagesThatCanNeverBeProcessedEndInTheDeadLetterQueue() {
         UUID unknownSkuEventId = UUID.randomUUID();
-        publish("{ this is not json");
-        publish("{\"eventId\":\"" + UUID.randomUUID() + "\",\"sku\":\"" + sku + "\",\"stockVersion\":1}");
-        publish(eventJson(unknownSkuEventId, "TEST-NO-EXISTE", 3, 1, ""));
+        String corrupt = "{ this is not json";
+        String missingFields = "{\"eventId\":\"" + UUID.randomUUID() + "\",\"sku\":\"" + sku
+                + "\",\"stockVersion\":1}";
+        String unknownSku = eventJson(unknownSkuEventId, "TEST-NO-EXISTE", 3, 1, "");
+        publish(corrupt);
+        publish(missingFields);
+        publish(unknownSku);
 
         await().atMost(PATIENCE).untilAsserted(() -> assertThat(queueDepth(DEAD_LETTER_QUEUE)).isEqualTo(3));
         assertThat(queueDepth(QUEUE)).isZero();
         assertThat(stored().getStockVersion()).isZero();
         assertThat(processedEventRepository.existsById(unknownSkuEventId)).isFalse();
-        Message first = rabbitTemplate.receive(DEAD_LETTER_QUEUE, 5000);
-        assertThat(first).isNotNull();
-        assertThat(new String(first.getBody(), StandardCharsets.UTF_8)).isEqualTo("{ this is not json");
+        java.util.List<String> bodies = new java.util.ArrayList<>();
+        for (int index = 0; index < 3; index++) {
+            Message message = rabbitTemplate.receive(DEAD_LETTER_QUEUE, 5000);
+            assertThat(message).isNotNull();
+            bodies.add(new String(message.getBody(), StandardCharsets.UTF_8));
+        }
+        assertThat(bodies).containsExactlyInAnyOrder(corrupt, missingFields, unknownSku);
     }
 
     @Test
@@ -271,9 +287,12 @@ class StockEventListenerIntegrationTest extends RabbitIntegrationTest {
         mockMvc.perform(get("/api/v1/catalog/products/" + sku)).andExpect(status().isOk());
 
         startBroker();
-        await().atMost(Duration.ofSeconds(60)).ignoreExceptions().untilAsserted(() -> {
-            publish(eventJson(UUID.randomUUID(), sku, 3, 1, ""));
-            assertThat(stored().getAvailableStock()).isEqualTo(3);
+        // Se publica UNA sola vez: se reintenta solo hasta que el envio no lance excepcion.
+        String body = eventJson(UUID.randomUUID(), sku, 3, 1, "");
+        await().atMost(Duration.ofSeconds(60)).ignoreExceptions().until(() -> {
+            publish(body);
+            return true;
         });
+        await().atMost(PATIENCE).untilAsserted(() -> assertThat(stored().getAvailableStock()).isEqualTo(3));
     }
 }
