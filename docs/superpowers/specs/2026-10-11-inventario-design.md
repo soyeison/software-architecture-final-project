@@ -409,6 +409,10 @@ sub-tarea responsable y su plan debe incluirlo.
 |---|---|
 | El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
 | El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
+| Las pruebas de integración comparten una sola base y cada venta exitosa deja una fila `PENDING` en `outbox`: las pruebas del relay y de `GET /outbox` deben vaciar la tabla (`TRUNCATE outbox`) en `@BeforeEach`, o el relay publicaría eventos de otras clases y los resultados del listado no serían deterministas | 4.6 |
+| La consulta del relay debe usar el literal `PENDING` (JPQL con el enum o SQL nativo): con un parámetro enlazado, PostgreSQL no puede usar el índice parcial `outbox_pending_index` | 4.6 |
+| `OutboxEvent` no tiene mutadores: agregar `markPublished(Instant)` y `recordFailure(String)` (sin setters), con `last_error` acotado (el mensaje, no la traza); documentar que el relay es de una sola instancia (`fixedDelay`), porque la entidad no tiene `@Version` | 4.6 |
+| `eventId` en el MDC dentro del relay; `outbox_recorded` se registra antes del commit (reformularlo o bajarlo a `DEBUG`) | 4.6 |
 | Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |
 
 ### Cierre de la fase 4
