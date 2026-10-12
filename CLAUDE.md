@@ -35,7 +35,7 @@ servicio), JWT, Docker Compose.
   infraestructura (ambos requieren Docker; `verify-infra.sh` también necesita curl y jq).
 - Datos semilla de referencia: `docs/seed-data.md`.
 - `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
-  integración). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
+  integración; requiere Docker). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
 - Tras cambiar el código de un servicio, `docker compose up -d --wait --build`: sin `--build`,
   Compose reutiliza la imagen anterior.
 - `scripts/generate-token.sh <pos|online|operator|no-scope>` genera un JWT de demo para Inventario
