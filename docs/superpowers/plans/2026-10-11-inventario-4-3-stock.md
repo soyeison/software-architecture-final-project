@@ -1007,7 +1007,7 @@ class StockEndpointIntegrationTest extends PostgresIntegrationTest {
 - [ ] **Step 10: Verificar todo**
 
 Run: `./mvnw verify`
-Expected: BUILD SUCCESS — 24 pruebas rápidas y 45 de integración (38 + 4 del repositorio + 7 del endpoint − 4 que ya estaban contadas… ver nota). Lo que importa: 0 fallos. Cifras de referencia: rápidas 24; integración = Application 5 + Security 25 + Script 6 + Seed 2 + Repository 4 + Endpoint 7 = 49.
+Expected: BUILD SUCCESS, 0 fallos. Cifras de referencia: 24 pruebas rápidas; integración = Application 5 + Security 25 + Script 6 + Seed 2 + Repository 4 + Endpoint 7 = 49.
 
 - [ ] **Step 11: Commit**
 
@@ -1299,9 +1299,8 @@ En `docs/superpowers/specs/2026-10-11-inventario-design.md`:
 
 1. §4 "Manejo de errores": agregar un punto: `- Las excepciones estándar de Spring MVC (405, 415, ...) conservan su estado y reciben el tipo genérico \`http-error\`; los parámetros faltantes, de tipo incorrecto o que violan una restricción responden \`validation-error\` con \`errors\`.`
 2. §5 "Pruebas": reemplazar `Las sub-tareas 4.3 y 4.4 lo eliminan y mueven esas pruebas a los endpoints reales.` por `La 4.3 retiró la ruta \`GET /{sku}\`, la 4.4 retirará la de \`POST …/sales\` y la 4.6 la de \`GET /outbox\`; las pruebas pasan a los endpoints reales.`
-3. §9 tabla "Pendientes heredados": eliminar las tres filas ya resueltas en 4.3 (excepciones de Spring MVC con `about:blank`; `allowEmptyShould` de la regla 3; `allowEmptyShould` de la regla 4) y agregar estas dos filas para la 4.4:
+3. §9 tabla "Pendientes heredados": eliminar las tres filas ya resueltas en 4.3 (excepciones de Spring MVC con `about:blank`; `allowEmptyShould` de la regla 3; `allowEmptyShould` de la regla 4) y agregar esta fila para la 4.4 (la fila de `validation-error` con `message` nulo o violaciones de clase ya existe para la 4.4: no duplicarla):
    - `| \`SeedDataIntegrationTest\` asume que ninguna prueba modifica los SKU sembrados: las pruebas de venta deben usar SKU \`TEST-<uuid>\` (\`TestStocks.insert\`); \`GenerateTokenScriptIntegrationTest.posAndOnlineTokensCanSell\` vende \`TENIS-RUNNER-42\` y debe pasar a un SKU propio | 4.4 |`
-   - `| \`validation-error\` con \`message\` nulo o con violaciones de clase (ya estaba) | 4.4 |` — solo si esa fila no existe todavía (no duplicar).
 4. §9 "Pruebas: dos velocidades": en `./mvnw verify`, añadir `(requiere Docker)` si no está.
 
 - [ ] **Step 4: Verificación completa**
