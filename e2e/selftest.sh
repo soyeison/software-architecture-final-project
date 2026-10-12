@@ -285,6 +285,21 @@ expect "render_run_report: métrica en tabla" "$(grep -c '^| gamma_ms | 30 |$' <
 rm -rf "$fake_dir" "$scenario_output"
 RESULT_NAMES=(); RESULT_STATUS=(); RESULT_DURATION_MS=(); METRIC_LINES=()
 
+# --- Argumentos de run-all.sh y de 11-latency.sh (fallan antes de tocar el stack) ---
+e2e_dir="$(dirname "${BASH_SOURCE[0]}")"
+"$e2e_dir/run-all.sh" --demo >/dev/null 2>&1
+expect "run-all.sh: rechaza --demo (código 2)" "$?" "2"
+"$e2e_dir/run-all.sh" --report >/dev/null 2>&1
+expect "run-all.sh: --report sin archivo (código 2)" "$?" "2"
+"$e2e_dir/run-all.sh" --otra >/dev/null 2>&1
+expect "run-all.sh: argumento desconocido (código 2)" "$?" "2"
+LATENCY_SALES=abc "$e2e_dir/11-latency.sh" >/dev/null 2>&1
+expect "11-latency.sh: LATENCY_SALES inválido falla antes de tocar el stack (código 1)" "$?" "1"
+expect "11-latency.sh: el mensaje nombra la variable" \
+  "$(LATENCY_SALES=abc "$e2e_dir/11-latency.sh" 2>&1 | grep -c 'LATENCY_SALES')" "1"
+LATENCY_P95_LIMIT_MS=0 "$e2e_dir/11-latency.sh" >/dev/null 2>&1
+expect "11-latency.sh: LATENCY_P95_LIMIT_MS inválido falla (código 1)" "$?" "1"
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1

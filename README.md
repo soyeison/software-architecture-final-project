@@ -175,13 +175,20 @@ stack de desarrollo con los puertos por defecto. Requieren Docker, `curl` y `jq`
 ```bash
 docker compose up -d --wait   # el stack debe estar levantado
 e2e/01-pos-sale.sh            # un escenario suelto; --demo narra paso a paso y espera Enter
-e2e/selftest.sh               # prueba de la lógica de e2e/lib.sh (sin Docker)
+e2e/selftest.sh               # prueba de la lógica de e2e/lib.sh y e2e/report.sh (sin Docker)
 e2e/reset.sh                  # DESTRUCTIVO: down -v + up --build, estado inicial conocido
+e2e/run-all.sh --reset --report resultados.md   # los 11 escenarios; --reset reinicia el stack (DESTRUCTIVO)
 ```
 
-Por ahora están los escenarios 01 (venta POS), 02 (venta online), 03 (carrera por la última unidad), 04
+Están los 11 escenarios: 01 (venta POS), 02 (venta online), 03 (carrera por la última unidad), 04
 (venta sin stock), 05 (Catálogo caído), 06 (mensaje duplicado), 07 (mensaje inválido), 08 (RabbitMQ caído),
-09 (eventos fuera de orden) y 10 (seguridad). Cada uno usa su SKU de `docs/seed-data.md` y compara contra el estado actual. El 03 necesita
+09 (eventos fuera de orden), 10 (seguridad) y 11 (latencia). `e2e/run-all.sh` los ejecuta todos en secuencia
+(cada uno como subproceso, y continúa tras un fallo) y resume PASS/FAIL con las duraciones y las métricas;
+`--report <archivo>` guarda ese resumen en Markdown. Sin `--reset` solo sirve si el stack está recién
+reiniciado: una segunda ejecución falla porque el stock se agota. El escenario 11 genera
+`docs/results/latency.md` (mínimo, promedio, p95 y máximo de 20 ventas, que falla si el p95 supera 1000 ms) y
+admite las variables `LATENCY_SALES`, `LATENCY_P95_LIMIT_MS` y `LATENCY_REPORT`; consume 20 unidades de
+GORRA-SPORT-NEGRA (2 ejecuciones por reinicio). Cada escenario usa su SKU de `docs/seed-data.md` y compara contra el estado actual. El 03 necesita
 stock exactamente 1 y solo corre una vez por reinicio; el 01 y el 02 consumen una unidad de
 TENIS-RUNNER-42 (stock sembrado 5), y el 07 consume otra, así que tras unas 5 ventas hace falta
 `e2e/reset.sh`; el 04, el 06, el 09 y el 10 se repiten sin límite. El 06 y el 09 inyectan eventos en
