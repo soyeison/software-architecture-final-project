@@ -109,6 +109,14 @@ Responde `201` con el `saleId`, el stock restante y la versión. Sin unidades su
 forma estricta: propiedades desconocidas, cantidades que no son enteros o un canal numérico responden `400 validation-error`.
 Cada venta de la semilla es real: para volver al estado inicial, `docker compose down -v`.
 
+Cada venta confirmada escribe, en la misma transacción que descuenta el stock, un evento
+`InventoryStockChanged` en la tabla `outbox` con estado `PENDING` (patrón Transactional Outbox). Si el
+outbox falla, la venta se revierte entera. Hasta la sub-tarea 4.6 nada lo publica a RabbitMQ; para verlo:
+
+```bash
+docker compose exec inventory-db psql -U inventory -d inventory -c "SELECT sequence_number, event_id, sku, status, attempts FROM outbox"
+```
+
 Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
 qué rutas existen. `/v3/api-docs` también se deniega; el contrato publicado es el de Swagger UI.
 
