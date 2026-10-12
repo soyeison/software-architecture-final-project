@@ -3,8 +3,9 @@
 # una venta devuelve 201, su evento pasa a PUBLISHED en el outbox y el mensaje aparece en la cola del
 # Catálogo. También comprueba que el contenedor no corre como root. Requiere Docker, curl y jq; la
 # primera vez construye la imagen (internet y unos minutos).
-# Mientras el Catálogo no consuma la cola (fase 5), el mensaje permanece en ella; cuando exista, la
-# comprobación de la cola dependerá de que el Catálogo esté detenido.
+# Este script levanta solo Inventario y sus dependencias, no el Catálogo: nadie consume la cola, así que
+# el mensaje permanece en ella y la comprobación de la cola es válida. El flujo completo hasta el Catálogo
+# lo prueba scripts/smoke-catalog-service.sh.
 set -uo pipefail   # sin -e a propósito: se ejecutan todos los checks y se agrega el resultado
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

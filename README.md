@@ -145,12 +145,13 @@ cd catalog-service
 ```
 
 Es el consumidor del flujo: mantiene la vista de disponibilidad con los eventos de Inventario y la
-expone por REST sin token. La consulta ya está disponible (el consumidor de eventos llega en las
-siguientes sub-tareas): la base `catalog-db` se siembra con los 7 productos de `docs/seed-data.md`.
+expone por REST sin token. La base `catalog-db` se siembra con los 7 productos de `docs/seed-data.md`.
 
-La aplicación de eventos (deduplicación por `eventId`, descarte de versiones viejas y cálculo de la latencia)
-ya está implementada y probada contra PostgreSQL, pero todavía no se alimenta de RabbitMQ: el consumidor
-llega en la siguiente sub-tarea.
+El Catálogo ya consume los eventos de la cola `catalog.inventory-stock-changed` con confirmación manual
+(deduplicación por `eventId`, descarte de versiones viejas y cálculo de la latencia). Los mensajes
+imposibles de procesar (JSON corrupto, campo faltante, SKU desconocido) van a la DLQ
+`catalog.inventory-stock-changed.dlq`, y los fallos transitorios se reintentan con espera creciente sin
+perder el mensaje. Si RabbitMQ cae, el servicio sigue respondiendo consultas y se reconecta solo.
 
 ```bash
 curl http://localhost:8082/api/v1/catalog/products                    # todos, ordenados por SKU
@@ -172,6 +173,7 @@ Requiere Docker; la verificación de la infraestructura también necesita `curl`
 scripts/verify-contracts.sh   # contratos: OpenAPI, schema del evento y topología de RabbitMQ
 scripts/verify-infra.sh       # infraestructura: Compose, credenciales, redes y persistencia (~1,5 min)
 scripts/smoke-inventory-service.sh   # servicio de Inventario en Compose: venta, outbox y cola (fase 4)
+scripts/smoke-catalog-service.sh    # flujo completo venta -> Catálogo en Compose (cierre de la fase 5)
 ```
 
 `verify-infra.sh` usa su propio proyecto (`retail-verify`) y sus propios puertos, de modo que puede
