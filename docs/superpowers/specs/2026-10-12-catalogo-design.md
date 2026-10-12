@@ -69,6 +69,8 @@ com.retail.catalog
 3. Los controladores no usan repositorios directamente: pasan por un caso de uso.
 4. `product/` no depende de `stockevent/`.
 
+Las reglas 3 y 4 permiten evaluación vacía en 5.1 (no hay clases que evaluar) y la 5.2 retira ese permiso.
+
 ## 4. Configuración, errores, logging y reloj
 
 ### Configuración
@@ -76,7 +78,7 @@ com.retail.catalog
 - `CatalogProperties` (`@ConfigurationProperties`, validada) agrupa lo propio del servicio:
   `catalog.consumer.queue` (por defecto `catalog.inventory-stock-changed`),
   `catalog.consumer.initial-backoff` (1 s) y `catalog.consumer.maximum-backoff` (30 s). Lo demás
-  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring.
+  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring. `CatalogProperties` llega en 5.4, con sus primeras propiedades reales; antes no habría nada que validar.
 - Los valores por defecto de `application.yml` apuntan a `localhost` (puertos 5442 y 5672), de modo
   que arrancar desde el IDE funciona sin configurar nada; Compose los sobrescribe con variables de
   entorno.
@@ -90,9 +92,7 @@ Un único `GlobalExceptionHandler` produce `application/problem+json` (RFC 9457)
 `ProblemType` como única fuente de tipos (`not-found`, `internal-error`, y el genérico `http-error`
 para los errores estándar de Spring MVC, como el 405). `ProductNotFoundException` responde `404`. Un
 error inesperado responde `internal-error` sin detalles internos y se registra completo. El mismo
-patrón y las mismas correcciones de Inventario (tipos `http-error`, `validation-error` para
-parámetros inválidos) se reutilizan; el Catálogo no recibe cuerpos, así que `validation-error` solo
-cubre parámetros de consulta inválidos.
+patrón de Inventario se reutiliza. El Catálogo no define `validation-error`: su contrato no tiene 400 y no recibe cuerpos ni parámetros de consulta.
 
 ### Logging
 
@@ -107,11 +107,11 @@ constructor. `updated_at` y la latencia usan este reloj.
 
 ### Salud
 
-El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`): si el
+El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`; la propiedad se configura en 5.4, al agregar AMQP): si el
 broker cae, el Catálogo sigue sirviendo consultas y el listener se reconecta solo. La salud de la base
 de datos permanece.
 
-## 5. Datos y consulta (sub-tareas 5.1 y 5.2)
+## 5. Datos y consulta (sub-tarea 5.2)
 
 ### Esquema (migraciones Flyway, comentarios en español)
 
@@ -265,9 +265,11 @@ RabbitMQ. Nunca hay una copia a mano en el repositorio.
   (`SERVER_PORT=8082`, `SPRING_DATASOURCE_*` hacia `catalog-db`, `SPRING_RABBITMQ_*`), puerto
   `127.0.0.1:8082` configurable con `CATALOG_SERVICE_PORT` (y en `.env.example`) y healthcheck con
   `/actuator/health`.
-- **Impacto en `scripts/verify-infra.sh`:** levanta solo `rabbitmq`, `inventory-db` y `catalog-db`; con
-  el servicio dentro del Compose no cambia, pero debe verificarse que `CATALOG_SERVICE_PORT` esté en su
-  lista de puertos propios y que `.env.example` coincida con los valores por defecto del Compose.
+- **Impacto en `scripts/verify-infra.sh`:** levanta solo `rabbitmq`, `inventory-db` y `catalog-db`;
+  se agregó `CATALOG_SERVICE_PORT` a la lista `-u` de la función `compose_defaults` (variables que se
+  quitan del entorno antes de comparar) y `.env.example` sigue alineado con los valores por defecto del
+  Compose. No necesita un puerto propio porque el script nunca levanta un servicio propio más allá de
+  rabbitmq y las bases de datos.
 - **Impacto en `scripts/smoke-inventory-service.sh`:** levanta solo `inventory-service` y sus
   dependencias (no el Catálogo), así que el mensaje sigue acumulándose en la cola y la comprobación de
   la cola se mantiene.
@@ -276,16 +278,24 @@ RabbitMQ. Nunca hay una copia a mano en el repositorio.
 
 | | Entrega | Cómo se comprueba | Escenarios |
 |---|---|---|---|
-| **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, configuración validada, salud sin RabbitMQ, Dockerfile sin root, `.dockerignore`, prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
-| **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}` | Respuesta contra el contrato; semilla igual al documento | consulta |
+| **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, Dockerfile sin root, `.dockerignore`, `CATALOG_SERVICE_PORT` y prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
+| **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}`; retirar `allowEmptyShould` de las reglas 3 y 4 de ArchUnit; decidir qué se publica en `/v3/api-docs` (el contrato publicado es el escrito a mano: aclararlo en el README o limitar la generación con `springdoc.paths-to-match`) | Respuesta contra el contrato; semilla igual al documento | consulta |
 | **5.3** | `ApplyStockChangeService`, `ProcessedEvent`, evento tolerante y validado | PostgreSQL real: aplicar, duplicado, viejo, SKU desconocido, atomicidad | 9 (a nivel de servicio) |
-| **5.4** | Listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
+| **5.4** | `CatalogProperties` (primeras propiedades reales: espera del reintento y nombre de la cola), salud sin RabbitMQ, listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
 
 **Dependencias por sub-tarea:** cada una agrega solo las que necesita (5.1: web, validación, actuator,
 springdoc, ArchUnit, el validador de JSON Schema y pruebas; 5.2: Data JPA, Flyway, PostgreSQL y
 Testcontainers; 5.4: AMQP y el módulo de RabbitMQ de Testcontainers). Los nombres exactos de los
 starters de Spring Boot 4 y las propiedades de Jackson 3 se confirman en cada plan, reutilizando lo ya
 verificado en Inventario.
+
+### Pendientes
+
+| Pendiente | Sub-tarea |
+|---|---|
+| `URI.create(requestPath)` en `GlobalExceptionHandler` y `ProblemType` lanza si la ruta trae caracteres como `[` o `]`: construir `instance` con `UriComponentsBuilder.fromPath(ruta).encode().build().toUri()` o prescindir de `instance` si no se puede interpretar (mismo código en Inventario: corregir en ambos servicios) | 5.2 (Catálogo); Inventario en la fase 6 o antes |
+| Endurecer la regla 2 de ArchUnit (`StockEventListener` por nombre simple) restringiéndola también al paquete `stockevent` | 5.4 |
+| `ClockConfigurationTest` de Inventario usa la variable de bucle `i` en lugar de `index` | Cualquier cambio futuro en Inventario |
 
 ### Cierre de la fase 5
 

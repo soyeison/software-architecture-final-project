@@ -16,6 +16,7 @@ docs/superpowers/specs/   Especificaciones de diseño
 docs/superpowers/plans/   Planes de implementación
 infra/rabbitmq/           Topología y configuración de RabbitMQ
 inventory-service/        Servicio de Inventario (Spring Boot)
+catalog-service/          Servicio de Catálogo (Spring Boot)
 scripts/                  Scripts de verificación y utilidades
 ```
 
@@ -38,6 +39,7 @@ Para levantar solo la infraestructura:
 | Base de Inventario | `localhost:5441` | `inventory-db:5432` | `inventory` / `inventory-demo`, base `inventory` |
 | Base de Catálogo | `localhost:5442` | `catalog-db:5432` | `catalog` / `catalog-demo`, base `catalog` |
 | Servicio de Inventario | http://localhost:8081 (Swagger UI en `/swagger-ui/index.html`) | `inventory-service:8081` | JWT de demo: `scripts/generate-token.sh <perfil>` |
+| Servicio de Catálogo | http://localhost:8082 (Swagger UI en `/swagger-ui/index.html`) | `catalog-service:8082` | consultas públicas, sin token |
 
 Son credenciales de **demo, no aptas para producción**. Los puertos se publican solo en
 `127.0.0.1`.
@@ -130,6 +132,22 @@ scripts/smoke-inventory-service.sh
 
 Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
 qué rutas existen. `/v3/api-docs` también se deniega; el contrato publicado es el de Swagger UI.
+
+## Servicio de Catálogo
+
+Código en `catalog-service/` (Java 25, Spring Boot 4, Maven wrapper). Diseño en la
+[spec del Catálogo](docs/superpowers/specs/2026-10-12-catalogo-design.md).
+
+```bash
+cd catalog-service
+./mvnw test     # pruebas unitarias y de arquitectura (rápidas)
+./mvnw verify   # además, las pruebas de integración (*IntegrationTest)
+```
+
+Es el consumidor del flujo: mantiene la vista de disponibilidad con los eventos de Inventario y la
+expone por REST sin token. En esta etapa solo está el esqueleto (arranca, sirve Swagger UI con el
+contrato y responde errores en `application/problem+json`); la consulta de productos y el consumidor de
+eventos llegan en las siguientes sub-tareas.
 
 ## Verificación
 

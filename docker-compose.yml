@@ -86,6 +86,36 @@ services:
       - messaging
       - inventory-net
 
+  catalog-service:
+    build:
+      context: .
+      dockerfile: catalog-service/Dockerfile
+    environment:
+      SERVER_PORT: "8082"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://catalog-db:5432/catalog
+      SPRING_DATASOURCE_USERNAME: catalog
+      SPRING_DATASOURCE_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog-demo}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: retail
+      SPRING_RABBITMQ_PASSWORD: retail-demo
+    ports:
+      - "127.0.0.1:${CATALOG_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    networks:
+      - messaging
+      - catalog-net
+
 networks:
   messaging:
   inventory-net:

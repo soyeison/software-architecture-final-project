@@ -26,9 +26,9 @@ servicio), JWT, Docker Compose.
 - Consumidores idempotentes (deduplicación por `eventId`), colas durables, ack manual y DLQ.
 
 ## Comandos
-- `docker compose up -d --wait` levanta RabbitMQ, las bases de datos e inventory-service (la primera
-  vez construye la imagen: requiere internet para Maven Central y Docker Hub y tarda unos minutos;
-  `--build` la reconstruye); `docker compose down -v`
+- `docker compose up -d --wait` levanta RabbitMQ, las bases de datos, inventory-service y
+  catalog-service (la primera vez construye las imágenes: requiere internet para Maven Central y
+  Docker Hub y tarda unos minutos; `--build` las reconstruye); `docker compose down -v`
   borra contenedores, redes y volúmenes (reinicia el estado de la demo); `stop`/`start` conservan
   los datos.
 - `scripts/verify-contracts.sh` verifica los contratos; `scripts/verify-infra.sh` verifica la
@@ -37,6 +37,7 @@ servicio), JWT, Docker Compose.
 - Datos semilla de referencia: `docs/seed-data.md`.
 - `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
   integración; requiere Docker). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.
+- `cd catalog-service && ./mvnw test` y `./mvnw verify`: igual que en Inventario.
 - Tras cambiar el código de un servicio, `docker compose up -d --wait --build`: sin `--build`,
   Compose reutiliza la imagen anterior.
 - `scripts/generate-token.sh <pos|online|operator|no-scope>` genera un JWT de demo para Inventario
