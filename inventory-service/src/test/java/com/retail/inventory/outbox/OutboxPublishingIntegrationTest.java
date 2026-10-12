@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -40,6 +41,9 @@ import com.retail.inventory.support.TestTokens;
 @SpringBootTest(properties = { "inventory.jwt.secret=" + TestTokens.SECRET,
         "inventory.outbox.relay-enabled=true", "inventory.outbox.poll-interval=100ms" })
 @AutoConfigureMockMvc
+// Cierra el contexto al terminar: si no, el publicador automático seguiría vivo en el caché de contextos
+// y publicaría filas de otras clases de prueba que comparten la base de datos y RabbitMQ.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OutboxPublishingIntegrationTest extends RabbitIntegrationTest {
 
     @Autowired
