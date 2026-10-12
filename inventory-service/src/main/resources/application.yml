@@ -11,6 +11,13 @@ spring:
     hibernate:
       # Flyway es el único dueño del esquema: una entidad desalineada impide el arranque.
       ddl-auto: validate
+  jackson:
+    # Entrada estricta, como dice el contrato: nada de propiedades desconocidas ni de 1.5 / "1" como entero.
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+    mapper:
+      allow-coercion-of-scalars: false
 
 server:
   port: 8081

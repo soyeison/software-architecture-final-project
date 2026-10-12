@@ -19,9 +19,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.retail.inventory.support.PostgresIntegrationTest;
+import com.retail.inventory.support.TestStocks;
 import com.retail.inventory.support.TestTokens;
 
 /**
@@ -42,10 +44,14 @@ class GenerateTokenScriptIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void posAndOnlineTokensCanSell() throws Exception {
+        String salesPath = "/api/v1/inventory/" + TestStocks.insert(jdbcTemplate, 10) + "/sales";
         for (String profile : new String[] {"pos", "online"}) {
-            mockMvc.perform(post(SALES_PATH).header(HttpHeaders.AUTHORIZATION, "Bearer " + generate(profile).output())
+            mockMvc.perform(post(salesPath).header(HttpHeaders.AUTHORIZATION, "Bearer " + generate(profile).output())
                             .contentType(MediaType.APPLICATION_JSON).content(SALE_BODY))
                     .andExpect(status().isCreated());
         }

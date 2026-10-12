@@ -15,6 +15,8 @@ public enum ProblemType {
     UNAUTHORIZED("unauthorized", "Unauthorized", HttpStatus.UNAUTHORIZED),
     FORBIDDEN("forbidden", "Forbidden", HttpStatus.FORBIDDEN),
     NOT_FOUND("not-found", "Not found", HttpStatus.NOT_FOUND),
+    INSUFFICIENT_STOCK("insufficient-stock", "Insufficient stock", HttpStatus.CONFLICT),
+    CONCURRENT_MODIFICATION("concurrent-modification", "Concurrent modification", HttpStatus.CONFLICT),
     INTERNAL_ERROR("internal-error", "Internal error", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private static final String TYPE_BASE_URI = "https://api.retail-demo.local/problems/";

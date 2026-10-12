@@ -24,6 +24,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.retail.inventory.sale.StockConflictException;
+import com.retail.inventory.stock.InsufficientStockException;
 import com.retail.inventory.stock.SkuNotFoundException;
 
 /**
@@ -91,6 +93,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ProblemDetail> handleSkuNotFound(SkuNotFoundException exception,
             HttpServletRequest request) {
         ProblemDetail problem = ProblemType.NOT_FOUND.toProblemDetail(exception.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ProblemDetail> handleInsufficientStock(InsufficientStockException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemType.INSUFFICIENT_STOCK
+                .toProblemDetail(exception.getMessage(), request.getRequestURI());
+        problem.setProperty("availableStock", exception.getAvailableStock());
+        problem.setProperty("requestedQuantity", exception.getRequestedQuantity());
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    @ExceptionHandler(StockConflictException.class)
+    public ResponseEntity<ProblemDetail> handleStockConflict(StockConflictException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemType.CONCURRENT_MODIFICATION
+                .toProblemDetail("Stock changed concurrently, please retry", request.getRequestURI());
         return ResponseEntity.status(problem.getStatus()).body(problem);
     }
 

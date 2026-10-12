@@ -71,6 +71,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void exhaustedRetriesReturnConcurrentModificationConflict() throws Exception {
+        String body = mockMvc.perform(get("/probe/conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "concurrent-modification"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "Problem");
+    }
+
+    @Test
     void unexpectedExceptionReturnsInternalErrorWithoutInternalDetails() throws Exception {
         String body = mockMvc.perform(get("/probe/failure"))
                 .andExpect(status().isInternalServerError())

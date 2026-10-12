@@ -24,6 +24,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.nimbusds.jose.JWSAlgorithm;
@@ -32,6 +33,7 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.retail.inventory.support.PostgresIntegrationTest;
+import com.retail.inventory.support.TestStocks;
 import com.retail.inventory.support.TestTokens;
 
 /**
@@ -49,6 +51,9 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void saleWithoutTokenIsUnauthorizedWithBearerChallenge() throws Exception {
@@ -106,7 +111,13 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void saleWithSellScopeIsAllowed() throws Exception {
-        mockMvc.perform(sale(TestTokens.withScope("inventory:sell"))).andExpect(status().isCreated());
+        String sku = TestStocks.insert(jdbcTemplate, 10);
+
+        mockMvc.perform(post("/api/v1/inventory/" + sku + "/sales")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(TestTokens.withScope("inventory:sell")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(SALE_BODY))
+                .andExpect(status().isCreated());
     }
 
     @Test

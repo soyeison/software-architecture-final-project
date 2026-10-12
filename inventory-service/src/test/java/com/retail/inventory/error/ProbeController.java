@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.retail.inventory.sale.StockConflictException;
+
 /**
  * Controlador solo de pruebas para ejercitar el manejo global de errores mientras no existen
  * endpoints reales. {@link TestComponent} lo excluye del escaneo de {@code @SpringBootTest}.
@@ -35,6 +37,11 @@ class ProbeController {
     @GetMapping("/probe/limit")
     int limit(@RequestParam @Min(1) int size) {
         return size;
+    }
+
+    @GetMapping("/probe/conflict")
+    String conflict() {
+        throw new StockConflictException("TENIS-RUNNER-42", 5, new IllegalStateException("version conflict"));
     }
 
     @GetMapping("/probe/failure")
