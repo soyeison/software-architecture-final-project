@@ -26,7 +26,7 @@ check() { # check <descripción> <valor obtenido> <valor esperado>
 
 compose_defaults() { # compose resuelto con un archivo de entorno dado y sin variables heredadas
   env -u RABBITMQ_AMQP_PORT -u RABBITMQ_MGMT_PORT -u INVENTORY_DB_PORT -u CATALOG_DB_PORT \
-      -u INVENTORY_DB_PASSWORD -u CATALOG_DB_PASSWORD -u INVENTORY_SERVICE_PORT -u JWT_SECRET \
+      -u INVENTORY_DB_PASSWORD -u CATALOG_DB_PASSWORD -u INVENTORY_SERVICE_PORT -u CATALOG_SERVICE_PORT -u JWT_SECRET \
       docker compose --env-file "$1" config
 }
 

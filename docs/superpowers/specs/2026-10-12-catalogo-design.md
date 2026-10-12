@@ -69,6 +69,8 @@ com.retail.catalog
 3. Los controladores no usan repositorios directamente: pasan por un caso de uso.
 4. `product/` no depende de `stockevent/`.
 
+Las reglas 3 y 4 permiten evaluación vacía en 5.1 (no hay clases que evaluar) y la 5.2 retira ese permiso.
+
 ## 4. Configuración, errores, logging y reloj
 
 ### Configuración
@@ -76,7 +78,7 @@ com.retail.catalog
 - `CatalogProperties` (`@ConfigurationProperties`, validada) agrupa lo propio del servicio:
   `catalog.consumer.queue` (por defecto `catalog.inventory-stock-changed`),
   `catalog.consumer.initial-backoff` (1 s) y `catalog.consumer.maximum-backoff` (30 s). Lo demás
-  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring.
+  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring. `CatalogProperties` llega en 5.4, con sus primeras propiedades reales; antes no habría nada que validar.
 - Los valores por defecto de `application.yml` apuntan a `localhost` (puertos 5442 y 5672), de modo
   que arrancar desde el IDE funciona sin configurar nada; Compose los sobrescribe con variables de
   entorno.
@@ -90,9 +92,7 @@ Un único `GlobalExceptionHandler` produce `application/problem+json` (RFC 9457)
 `ProblemType` como única fuente de tipos (`not-found`, `internal-error`, y el genérico `http-error`
 para los errores estándar de Spring MVC, como el 405). `ProductNotFoundException` responde `404`. Un
 error inesperado responde `internal-error` sin detalles internos y se registra completo. El mismo
-patrón y las mismas correcciones de Inventario (tipos `http-error`, `validation-error` para
-parámetros inválidos) se reutilizan; el Catálogo no recibe cuerpos, así que `validation-error` solo
-cubre parámetros de consulta inválidos.
+patrón de Inventario se reutiliza. El Catálogo no define `validation-error`: su contrato no tiene 400 y no recibe cuerpos ni parámetros de consulta.
 
 ### Logging
 
@@ -107,7 +107,7 @@ constructor. `updated_at` y la latencia usan este reloj.
 
 ### Salud
 
-El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`): si el
+El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`; la propiedad se configura en 5.4, al agregar AMQP): si el
 broker cae, el Catálogo sigue sirviendo consultas y el listener se reconecta solo. La salud de la base
 de datos permanece.
 
@@ -276,10 +276,10 @@ RabbitMQ. Nunca hay una copia a mano en el repositorio.
 
 | | Entrega | Cómo se comprueba | Escenarios |
 |---|---|---|---|
-| **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, configuración validada, salud sin RabbitMQ, Dockerfile sin root, `.dockerignore`, prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
+| **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, Dockerfile sin root, `.dockerignore`, `CATALOG_SERVICE_PORT` y prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
 | **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}` | Respuesta contra el contrato; semilla igual al documento | consulta |
 | **5.3** | `ApplyStockChangeService`, `ProcessedEvent`, evento tolerante y validado | PostgreSQL real: aplicar, duplicado, viejo, SKU desconocido, atomicidad | 9 (a nivel de servicio) |
-| **5.4** | Listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
+| **5.4** | `CatalogProperties` (primeras propiedades reales: espera del reintento y nombre de la cola), salud sin RabbitMQ, listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
 
 **Dependencias por sub-tarea:** cada una agrega solo las que necesita (5.1: web, validación, actuator,
 springdoc, ArchUnit, el validador de JSON Schema y pruebas; 5.2: Data JPA, Flyway, PostgreSQL y

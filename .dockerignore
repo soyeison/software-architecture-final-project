@@ -2,4 +2,6 @@
 *
 !docs/contracts/
 !inventory-service/
+!catalog-service/
 inventory-service/target/
+catalog-service/target/
