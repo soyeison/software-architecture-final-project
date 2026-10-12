@@ -264,7 +264,7 @@ SaleController          valida el cuerpo (cantidad ≥ 1, canal válido) y llama
 - El servicio devuelve un `StockChange`; el controlador arma el `SaleResponse` con la petición y ese
   resultado, sin clase intermedia.
 - **Entrada estricta, como dice el contrato:** Jackson rechaza propiedades desconocidas y no convierte
-  `1.5` ni `"1"` en entero; se configura con tres opciones de Jackson en application.yml (fail-on-unknown-properties, accept-float-as-int y allow-coercion-of-scalars), las tres necesarias.
+  `1.5` ni `"1"` en entero ni acepta números como valor de un enum (`"channel": 0`); se configura con cuatro opciones de Jackson en application.yml (fail-on-unknown-properties, accept-float-as-int, allow-coercion-of-scalars y datatype.enum.fail-on-numbers-for-enums, que en Jackson 3 es una EnumFeature), las cuatro necesarias.
 - **4.4 no escribe el evento:** la sub-tarea 4.5 agrega la llamada a `OutboxRecorder` dentro de la misma
   transacción.
 

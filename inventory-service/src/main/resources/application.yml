@@ -18,6 +18,10 @@ spring:
       accept-float-as-int: false
     mapper:
       allow-coercion-of-scalars: false
+    datatype:
+      enum:
+        # El canal es un enum de texto: 0 / 1 no deben interpretarse como ordinales (en Jackson 3 es una EnumFeature).
+        fail-on-numbers-for-enums: true
 
 server:
   port: 8081

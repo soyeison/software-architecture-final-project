@@ -114,6 +114,8 @@ class SaleEndpointIntegrationTest extends PostgresIntegrationTest {
                 "{\"quantity\": 0, \"channel\": \"POS\"}",
                 "{\"quantity\": -1, \"channel\": \"POS\"}",
                 "{\"quantity\": 1, \"channel\": \"PHONE\"}",
+                "{\"quantity\": 1, \"channel\": 0}",
+                "{\"quantity\": 1, \"channel\": 1}",
                 "{\"quantity\": 1}",
                 "{\"channel\": \"POS\"}",
                 "{\"quantity\": null, \"channel\": \"POS\"}",

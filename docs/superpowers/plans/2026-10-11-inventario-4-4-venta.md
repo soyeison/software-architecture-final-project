@@ -1150,7 +1150,7 @@ Expected: PASS (21 pruebas: 20 repeticiones + la ráfaga). Estas pruebas verific
 
 - [ ] **Step 3: Mutación de comprobación (no se commitea)**
 
-Run: `./mvnw verify -Dit.test=SaleConcurrencyIntegrationTest -Dinventory.sale.max-attempts=1`
+Run: `./mvnw verify -Dit.test=SaleConcurrencyIntegrationTest -Dinventory.sale.max-attempts=1 -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: FAIL en la carrera de la última unidad (con un solo intento el perdedor recibe `concurrent-modification` en lugar de `insufficient-stock`): prueba que la carrera produce conflictos reales y que el reintento los resuelve. Si en cambio pasa, la prueba no está generando contención real: investigar antes de continuar (más hilos o `CountDownLatch` mal usado). Verificar que el árbol de trabajo no cambió (`git status` limpio salvo el archivo de prueba).
 
 - [ ] **Step 4: Verificar todo y repetir**

@@ -43,13 +43,16 @@ public class RegisterSaleService {
     /**
      * Descuenta {@code quantity} unidades del SKU.
      *
+     * <p><b>No debe llamarse dentro de una transacción existente:</b> {@link TransactionTemplate} usa
+     * {@code PROPAGATION_REQUIRED}, así que el primer conflicto marcaría la transacción externa como
+     * solo-rollback y los reintentos no tendrían sentido.
+     *
      * @throws SkuNotFoundException si el SKU no existe
      * @throws com.retail.inventory.stock.InsufficientStockException si no hay unidades suficientes
      * @throws StockConflictException si el conflicto de versión persiste tras agotar los reintentos
      */
     public StockChange register(String sku, int quantity, Channel channel) {
-        MDC.put("sku", sku);
-        try {
+        try (MDC.MDCCloseable ignored = MDC.putCloseable("sku", sku)) {
             StockChange change = optimisticRetry.run(
                     () -> transactionTemplate.execute(status -> sell(sku, quantity, channel)));
             LOGGER.info("sale_registered sku={} channel={} saleId={} remaining={}", sku, channel, change.eventId(),
@@ -58,8 +61,6 @@ public class RegisterSaleService {
         } catch (OptimisticLockingFailureException exception) {
             LOGGER.warn("sale_conflict sku={} attempts={}", sku, optimisticRetry.maxAttempts());
             throw new StockConflictException(sku, optimisticRetry.maxAttempts(), exception);
-        } finally {
-            MDC.remove("sku");
         }
     }
 
