@@ -143,8 +143,14 @@ queue_messages() {
 # queue_is_empty <cola>: éxito si la cola no tiene mensajes (para wait_until).
 queue_is_empty() { [[ "$(queue_messages "$1")" == "0" ]]; }
 
-# synced <sku>: éxito si el Catálogo muestra el mismo stock que Inventario.
-synced() { [[ "$(catalog_stock "$1")" == "$(inventory_stock "$1")" ]]; }
+# synced <sku>: éxito si el Catálogo muestra el mismo stock que Inventario; ambos deben ser enteros
+# (una consulta fallida deja vacío o null y no cuenta como coincidencia).
+synced() {
+  local catalog inventory
+  catalog="$(catalog_stock "$1")"
+  inventory="$(inventory_stock "$1")"
+  [[ "$(is_integer "$catalog")" == "yes" && "$catalog" == "$inventory" ]]
+}
 
 # fail_precondition <mensaje>: termina el escenario sin ejecutarlo.
 fail_precondition() {

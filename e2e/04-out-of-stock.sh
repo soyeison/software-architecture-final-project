@@ -11,6 +11,7 @@ require_synced "$SKU"
 stock="$(inventory_stock "$SKU")"
 [[ "$stock" == "0" ]] || fail_precondition "$SKU tiene stock $stock y el escenario necesita 0"
 events_before="$(outbox_count "$SKU")"
+[[ "$(is_integer "$events_before")" == "yes" ]] || fail_precondition "no se pudo leer el outbox de Inventario"
 
 step "Venta de 1 unidad de $SKU, que no tiene stock"
 sell "$SKU" POS

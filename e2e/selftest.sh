@@ -60,6 +60,17 @@ expect "wait_until: tiempo agotado devuelve 1" "$?" "1"
 expect "wait_until: tiempo agotado marca fallo" "$E2E_STATUS" "1"
 expect "wait_until: respeta el tiempo máximo (≥ 2000 ms)" "$([[ $WAITED_MS -ge 2000 ]] && echo yes || echo no)" "yes"
 
+# --- synced (con catalog_stock e inventory_stock simulados, sin Docker) ---
+synced_with() { # synced_with <catálogo> <inventario>
+  eval "catalog_stock() { echo '$1'; }; inventory_stock() { echo '$2'; }"
+  synced X && echo yes || echo no
+}
+expect "synced: dos enteros iguales" "$(synced_with 5 5)" "yes"
+expect "synced: enteros distintos" "$(synced_with 5 4)" "no"
+expect "synced: ambos vacíos" "$(synced_with '' '')" "no"
+expect "synced: ambos null" "$(synced_with null null)" "no"
+expect "synced: catálogo vacío e Inventario entero" "$(synced_with '' 5)" "no"
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1

@@ -6,6 +6,7 @@ set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+(( $# > 1 )) && { echo "Uso: $0 [--no-build]" >&2; exit 2; }
 build_flag="--build"
 case "${1:-}" in
   "") ;;

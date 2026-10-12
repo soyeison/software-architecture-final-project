@@ -12,6 +12,7 @@ require_synced "$SKU"
 stock="$(inventory_stock "$SKU")"
 [[ "$stock" == "1" ]] || fail_precondition "$SKU tiene stock $stock y el escenario necesita exactamente 1"
 events_before="$(outbox_count "$SKU")"
+[[ "$(is_integer "$events_before")" == "yes" ]] || fail_precondition "no se pudo leer el outbox de Inventario"
 
 results="$(mktemp -d)"
 trap 'rm -rf "$results"' EXIT
