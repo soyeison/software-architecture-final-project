@@ -225,10 +225,16 @@ now_ms() { date +%s%3N; }
 # metric <nombre> <valor>: imprime una métrica con un formato fijo que run-all.sh puede recoger.
 metric() { echo "METRIC $1=$2"; }
 
-# stop_service <servicio>: detiene un contenedor del Compose y lo registra para restaurarlo al salir.
+# stop_service <servicio>: detiene un contenedor del Compose y lo registra para restaurarlo al salir. Lo registra
+# ANTES de detenerlo y lo deja registrado aunque compose falle (podría haber quedado detenido a medias; levantarlo
+# con --no-recreate es idempotente). No lo registra dos veces.
 stop_service() {
+  local service registered=0
+  for service in "${STOPPED_SERVICES[@]}"; do
+    [[ "$service" == "$1" ]] && registered=1
+  done
+  (( registered )) || STOPPED_SERVICES+=("$1")
   compose stop "$1" >/dev/null 2>&1 || return 1
-  STOPPED_SERVICES+=("$1")
 }
 
 # start_service <servicio>: levanta el contenedor, espera a que esté sano y lo quita del registro.

@@ -160,8 +160,11 @@ expect "restore_services: levantó catalog-service" \
 expect "restore_services: levantó rabbitmq" "$(grep -c '^up .* rabbitmq$' "$calls_file")" "1"
 
 failing_stop() { COMPOSE_STATUS=1 stop_service rabbitmq; echo "estado=$?"; }
-expect "stop_service: si compose falla devuelve 1 y no registra el servicio" \
-  "$(registry_state failing_stop | paste -sd' ')" "estado=1 registro=[]"
+expect "stop_service: si compose falla devuelve 1 y deja registrado el servicio" \
+  "$(registry_state failing_stop | paste -sd' ')" "estado=1 registro=[rabbitmq]"
+twice_stop() { stop_service rabbitmq; stop_service rabbitmq; }
+expect "stop_service: detener dos veces el mismo servicio no lo registra duplicado" \
+  "$(registry_state twice_stop)" "registro=[rabbitmq]"
 failing_start() { stop_service rabbitmq; COMPOSE_STATUS=1 start_service rabbitmq; echo "estado=$?"; }
 expect "start_service: si compose falla devuelve 1 y conserva el registro" \
   "$(registry_state failing_start | paste -sd' ')" "estado=1 registro=[rabbitmq]"
