@@ -91,10 +91,31 @@ class StockEventReaderTest {
             "{\"eventId\":\"no-es-un-uuid\",\"sku\":\"A\",\"newStock\":1,\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}",
             "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":1,\"stockVersion\":1,\"occurredAt\":\"ayer\"}",
             "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"   \",\"newStock\":1,\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}",
-            "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":\"muchos\",\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}"
+            "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":\"muchos\",\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}",
+            "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":1.5,\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}",
+            "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":\"5\",\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}",
+            "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":1,\"stockVersion\":2.0,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}"
     })
     void rejectsBodiesThatAreNotUsableEvents(String body) {
         assertThatThrownBy(() -> reader.read(json(body))).isInstanceOf(InvalidEventException.class);
+    }
+
+    @Test
+    void rejectsANullBody() {
+        assertThatThrownBy(() -> reader.read(null))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessage("The message body is empty");
+    }
+
+    @Test
+    void acceptsASkuOfExactly64CharactersAndRejectsOneOf65() {
+        String template = "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"%s\",\"newStock\":1,"
+                + "\"stockVersion\":1,\"occurredAt\":\"2026-10-10T15:04:05.123Z\"}";
+
+        assertThat(reader.read(json(template.formatted("A".repeat(64)))).sku()).hasSize(64);
+        assertThatThrownBy(() -> reader.read(json(template.formatted("A".repeat(65)))))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("sku");
     }
 
     @Test

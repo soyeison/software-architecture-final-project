@@ -9,6 +9,8 @@ import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -22,12 +24,19 @@ public class StockEventReader {
     private final Validator validator;
 
     public StockEventReader(JsonMapper jsonMapper, Validator validator) {
-        this.jsonMapper = jsonMapper;
+        // Lectura estricta de tipos, sin tocar el mapper global: 1.5 no se trunca a 1 ni "5" se acepta como 5.
+        this.jsonMapper = jsonMapper.rebuild()
+                .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+                .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
+                .build();
         this.validator = validator;
     }
 
     /** @throws InvalidEventException si el cuerpo no es JSON válido o incumple las validaciones */
     public StockChangedEvent read(byte[] body) {
+        if (body == null) {
+            throw new InvalidEventException("The message body is empty");
+        }
         StockChangedEvent event;
         try {
             event = jsonMapper.readValue(body, StockChangedEvent.class);
