@@ -302,7 +302,8 @@ CREATE INDEX outbox_pending_index ON outbox (sequence_number) WHERE status = 'PE
 ```
 
 - `sequence_number` fija el orden de publicación. Para un mismo SKU el orden es el de confirmación: la
-  segunda venta espera la fila de stock de la primera, así que su inserción ocurre después. Entre SKU
+  segunda venta espera el bloqueo de la fila de stock, falla la verificación de versión y reintenta; el
+  INSERT del reintento es el que ocurre después del commit de la primera. Entre SKU
   distintos el orden no importa, porque el Catálogo guarda la versión por producto.
 - `StockEventFactory` genera el JSON a partir del `StockChange` y **formatea `occurredAt` con exactamente
   3 decimales** en UTC, aunque los milisegundos sean cero.
@@ -336,6 +337,7 @@ OutboxRelay (@Scheduled fixedDelay 500 ms)
   `status`. Un valor desconocido responde `validation-error`.
 - Propiedades: `inventory.outbox.poll-interval` (500 ms), `batch-size` (50), `confirm-timeout` (5 s) y
   `relay-enabled` (por defecto `true`; las pruebas lo apagan para controlar cuándo corre el relay).
+- El relay corre en una sola instancia (`fixedDelay`); `OutboxEvent` no tiene `@Version` porque nadie más modifica la fila. Para varias instancias, `SKIP LOCKED` por sí solo rompería el orden por SKU (la instancia 2 saltaría un A#n bloqueado y publicaría A#n+1): habría que usar un único relay activo (elección de líder o un lock) o particionar por SKU.
 
 ### Pruebas
 
@@ -407,19 +409,14 @@ sub-tarea responsable y su plan debe incluirlo.
 
 | Pendiente | Sub-tarea |
 |---|---|
-| El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
-| El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
-| Las pruebas de integración comparten una sola base y cada venta exitosa deja una fila `PENDING` en `outbox`: las pruebas del relay y de `GET /outbox` deben vaciar la tabla (`TRUNCATE outbox`) en `@BeforeEach`, o el relay publicaría eventos de otras clases y los resultados del listado no serían deterministas | 4.6 |
-| La consulta del relay debe usar el literal `PENDING` (JPQL con el enum o SQL nativo): con un parámetro enlazado, PostgreSQL no puede usar el índice parcial `outbox_pending_index` | 4.6 |
-| `OutboxEvent` no tiene mutadores: agregar `markPublished(Instant)` y `recordFailure(String)` (sin setters), con `last_error` acotado (el mensaje, no la traza); documentar que el relay es de una sola instancia (`fixedDelay`), porque la entidad no tiene `@Version` | 4.6 |
-| `eventId` en el MDC dentro del relay; `outbox_recorded` se registra antes del commit (reformularlo o bajarlo a `DEBUG`) | 4.6 |
+| `outbox_recorded` se registra antes del commit: reformularlo o bajarlo a `DEBUG` (solo informativo) | Opcional |
 | Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |
 
 ### Cierre de la fase 4
 
 Un script de humo, `scripts/smoke-inventory-service.sh`, con el servicio dentro de Compose: una venta
 devuelve 201, el outbox pasa a `PUBLISHED` y el mensaje aparece en la cola del Catálogo. Es solo lo
-mínimo para dar la fase por terminada; los escenarios completos son de la fase 6.
+mínimo para dar la fase por terminada; los escenarios completos son de la fase 6. El script existe: `scripts/smoke-inventory-service.sh`.
 
 ## 10. Decisiones descartadas
 

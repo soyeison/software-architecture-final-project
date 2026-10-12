@@ -46,6 +46,24 @@ class InventoryPropertiesTest {
     }
 
     @Test
+    void outboxDefaultsMatchTheSpec() {
+        contextRunner.withPropertyValues("inventory.jwt.secret=" + SECRET_OF_32_BYTES)
+                .run(context -> {
+                    InventoryProperties.Outbox outbox = context.getBean(InventoryProperties.class).outbox();
+                    assertThat(outbox.pollInterval()).isEqualTo(java.time.Duration.ofMillis(500));
+                    assertThat(outbox.batchSize()).isEqualTo(50);
+                    assertThat(outbox.confirmTimeout()).isEqualTo(java.time.Duration.ofSeconds(5));
+                    assertThat(outbox.relayEnabled()).isTrue();
+                });
+    }
+
+    @Test
+    void outboxBatchSizeMustBeAtLeastOne() {
+        contextRunner.withPropertyValues("inventory.jwt.secret=" + SECRET_OF_32_BYTES, "inventory.outbox.batch-size=0")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
     void failsToStartWhenSecretIsMissing() {
         contextRunner.withPropertyValues("inventory.jwt.secret=")
                 .run(context -> assertThat(context).hasFailed()

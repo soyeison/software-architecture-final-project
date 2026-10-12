@@ -13,12 +13,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Fila del outbox: un evento pendiente de publicar o ya publicado. Sin setters; los cambios de estado
- * del publicador llegan en la sub-tarea 4.6.
+ * Fila del outbox: un evento pendiente de publicar o ya publicado. Sin setters: el estado cambia solo con
+ * {@link #markPublished} y {@link #recordFailure}. No tiene {@code @Version}: el publicador corre en una
+ * sola instancia con {@code fixedDelay}, así que nadie más modifica la fila a la vez.
  */
 @Entity
 @Table(name = "outbox")
 public class OutboxEvent {
+
+    static final int MAXIMUM_ERROR_LENGTH = 500;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,6 +69,18 @@ public class OutboxEvent {
         this.status = OutboxStatus.PENDING;
         this.attempts = 0;
         this.occurredAt = occurredAt;
+    }
+
+    /** El broker confirmó el evento. */
+    public void markPublished(Instant now) {
+        this.status = OutboxStatus.PUBLISHED;
+        this.publishedAt = now;
+    }
+
+    /** Un intento de publicación falló: suma el intento y guarda el motivo (acotado) sin cambiar el estado. */
+    public void recordFailure(String error) {
+        this.attempts++;
+        this.lastError = error.length() > MAXIMUM_ERROR_LENGTH ? error.substring(0, MAXIMUM_ERROR_LENGTH) : error;
     }
 
     public Long getSequenceNumber() {

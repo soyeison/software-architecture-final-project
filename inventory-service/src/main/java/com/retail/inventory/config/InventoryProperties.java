@@ -1,6 +1,7 @@
 package com.retail.inventory.config;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -18,12 +19,25 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "inventory")
-public record InventoryProperties(@Valid @NotNull Jwt jwt, @Valid @DefaultValue Sale sale) {
+public record InventoryProperties(@Valid @NotNull Jwt jwt, @Valid @DefaultValue Sale sale,
+        @Valid @DefaultValue Outbox outbox) {
 
     /**
      * Parámetros de la venta: intentos máximos ante conflictos de versión (bloqueo optimista).
      */
     public record Sale(@DefaultValue("5") @Min(1) int maxAttempts) {
+    }
+
+    /**
+     * Parámetros del publicador del outbox.
+     *
+     * @param pollInterval cada cuánto busca eventos pendientes (espera entre ejecuciones)
+     * @param batchSize máximo de eventos que lee por ejecución
+     * @param confirmTimeout tiempo máximo de espera de la confirmación del broker
+     * @param relayEnabled apaga el publicador automático (las pruebas controlan cuándo corre)
+     */
+    public record Outbox(@DefaultValue("500ms") Duration pollInterval, @DefaultValue("50") @Min(1) int batchSize,
+            @DefaultValue("5s") Duration confirmTimeout, @DefaultValue("true") boolean relayEnabled) {
     }
 
     /**

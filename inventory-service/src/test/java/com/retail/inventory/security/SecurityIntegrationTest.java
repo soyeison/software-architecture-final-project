@@ -21,7 +21,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,7 +40,6 @@ import com.retail.inventory.support.TestTokens;
  */
 @SpringBootTest(properties = "inventory.jwt.secret=" + TestTokens.SECRET)
 @AutoConfigureMockMvc
-@Import(SecuredProbeController.class)
 class SecurityIntegrationTest extends PostgresIntegrationTest {
 
     private static final String PROBLEM_TYPE_BASE = "https://api.retail-demo.local/problems/";
@@ -141,7 +139,8 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     void outboxDiagnosticIsPublicAndNotTakenAsASku() throws Exception {
         mockMvc.perform(get("/api/v1/inventory/outbox"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("outbox"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray());
     }
 
     @Test

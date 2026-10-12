@@ -11,6 +11,19 @@ spring:
     hibernate:
       # Flyway es el único dueño del esquema: una entidad desalineada impide el arranque.
       ddl-auto: validate
+  rabbitmq:
+    # Valores para correr desde el IDE; Compose los sobrescribe con SPRING_RABBITMQ_*.
+    host: localhost
+    port: 5672
+    username: retail
+    password: retail-demo
+    # Una caída de RabbitMQ no debe bloquear el ciclo del publicador.
+    connection-timeout: 2s
+    # Publisher confirms y mandatory: solo cuenta como enviado si el broker confirma y no devuelve el mensaje.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   jackson:
     # Entrada estricta, como dice el contrato: nada de propiedades desconocidas ni de 1.5 / "1" como entero.
     deserialization:
@@ -33,6 +46,10 @@ inventory:
     issuer: retail-demo-auth
 
 management:
+  health:
+    rabbit:
+      # Una caída de RabbitMQ (escenario 8) no debe marcar el servicio como no sano: la venta sigue funcionando.
+      enabled: false
   endpoints:
     web:
       exposure:

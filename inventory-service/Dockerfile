@@ -18,5 +18,8 @@ RUN test -f target/classes/static/openapi/inventory-service.yaml
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 COPY --from=build /workspace/inventory-service/target/inventory-service-*.jar app.jar
+# El servicio no necesita privilegios: corre con un usuario sin permisos especiales.
+RUN addgroup -S app && adduser -S -G app app
+USER app
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
