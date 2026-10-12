@@ -34,14 +34,25 @@ require_stack
 
 scenarios=("$E2E_DIR"/[0-9][0-9]-*.sh)
 (( ${#scenarios[@]} == 11 )) || { echo "FAIL: se esperaban 11 escenarios y hay ${#scenarios[@]}"; exit 1; }
+# Ctrl+C o SIGTERM al grupo: el trap del padre corre cuando termina el escenario en primer plano (que restaura sus
+# contenedores antes de salir con 130 o 143); entonces se corta el bucle y se resume lo ejecutado.
+trap 'INTERRUPTED=1' INT TERM
 for script in "${scenarios[@]}"; do
+  (( INTERRUPTED )) && break
   run_scenario "$script"
+  (( INTERRUPTED )) && break
 done
 render_summary
+if (( INTERRUPTED )); then
+  echo "Ejecución interrumpida"
+fi
 
 if [[ -n "$report_file" ]]; then
   mkdir -p "$(dirname "$report_file")"
   render_run_report "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$report_file"
   echo "Informe escrito en $report_file"
+fi
+if (( INTERRUPTED )); then
+  exit 130
 fi
 (( $(count_passed) == ${#RESULT_NAMES[@]} ))

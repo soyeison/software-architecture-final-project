@@ -251,7 +251,7 @@ expect "render_latency_report: fecha" "$(grep -c 'Fecha (UTC):\*\* 2026-10-12T10
 expect "render_latency_report: número de muestras" "$(grep -c 'Muestras:\*\* 3 ventas de `GORRA-SPORT-NEGRA`' <<<"$latency_report")" "1"
 expect "render_latency_report: fila de estadísticas" "$(grep -c '^| 51 ms | 312.4 ms | 571 ms | 580 ms |$' <<<"$latency_report")" "1"
 expect "render_latency_report: comparación con el antes" "$(grep -c 'p95 medido: 571 ms' <<<"$latency_report")" "1"
-expect "render_latency_report: factor de mejora" "$(grep -c 'unas \*\*3152 veces\*\*' <<<"$latency_report")" "1"
+expect "render_latency_report: factor de mejora" "$(grep -c 'unas \*\*3152 veces\*\* menor que el peor caso del proceso por lotes' <<<"$latency_report")" "1"
 expect "render_latency_report: cumple el objetivo" "$(grep -c 'cumple: sí' <<<"$latency_report")" "1"
 expect "render_latency_report: una fila por muestra" "$(grep -c '^| [0-9]* | \(POS\|ONLINE\) | [0-9]* |$' <<<"$latency_report")" "3"
 expect "render_latency_report: muestra con su canal" "$(grep -c '^| 2 | ONLINE | 571 |$' <<<"$latency_report")" "1"
@@ -282,6 +282,21 @@ run_report="$(render_run_report 2026-10-12T10:00:00Z)"
 expect "render_run_report: resultado global" "$(grep -c 'Resultado:\*\* 2 de 3 escenarios OK' <<<"$run_report")" "1"
 expect "render_run_report: fila de tabla" "$(grep -c '^| 02-broken | FAIL | ' <<<"$run_report")" "1"
 expect "render_run_report: métrica en tabla" "$(grep -c '^| gamma_ms | 30 |$' <<<"$run_report")" "1"
+# Interrupción: un escenario que termina con 130 (Ctrl+C) o 143 (SIGTERM) marca INTERRUPTED
+printf '#!/usr/bin/env bash\nexit 130\n' >"$fake_dir/04-int.sh"
+printf '#!/usr/bin/env bash\nexit 143\n' >"$fake_dir/05-term.sh"
+RESULT_NAMES=(); RESULT_STATUS=(); RESULT_DURATION_MS=(); METRIC_LINES=()
+INTERRUPTED=0
+run_scenario "$fake_dir/02-broken.sh" >/dev/null
+expect "run_scenario: un código 1 no marca INTERRUPTED" "$INTERRUPTED" "0"
+run_scenario "$fake_dir/04-int.sh" >/dev/null
+expect "run_scenario: el código 130 marca INTERRUPTED" "$INTERRUPTED" "1"
+expect "run_scenario: el código 130 se registra como FAIL" "${RESULT_STATUS[1]}" "FAIL"
+INTERRUPTED=0
+run_scenario "$fake_dir/05-term.sh" >/dev/null
+expect "run_scenario: el código 143 marca INTERRUPTED" "$INTERRUPTED" "1"
+expect "run_scenario: el código 143 se registra como FAIL" "${RESULT_STATUS[2]}" "FAIL"
+INTERRUPTED=0
 rm -rf "$fake_dir" "$scenario_output"
 RESULT_NAMES=(); RESULT_STATUS=(); RESULT_DURATION_MS=(); METRIC_LINES=()
 

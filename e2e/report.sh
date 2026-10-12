@@ -12,6 +12,8 @@ RESULT_NAMES=()
 RESULT_STATUS=()
 RESULT_DURATION_MS=()
 METRIC_LINES=()
+# 1 cuando un escenario termina interrumpido (código 130 por Ctrl+C o 143 por SIGTERM); run-all.sh corta la ejecución.
+INTERRUPTED=0
 
 # format_duration_ms <ms>: duración en segundos con un decimal (por ejemplo "6.5 s").
 format_duration_ms() { awk -v ms="$1" 'BEGIN { printf "%.1f s", ms / 1000 }'; }
@@ -42,8 +44,11 @@ render_latency_report() {
   printf '| Peor caso | 30 min (%s ms) | p95 medido: %s ms |\n' "$BEFORE_WORST_CASE_MS" "$p95"
   printf '| Promedio | ~15 min (%s ms) | promedio medido: %s ms |\n' "$BEFORE_AVERAGE_MS" "$average"
   printf '| Ventana de sobreventa | Hasta 30 min | Hasta la latencia medida; Inventario rechaza toda venta sin stock |\n\n'
-  printf 'El peor caso medido (p95) es unas **%s veces** menor que el peor caso del proceso por lotes.\n\n' \
+  printf 'El p95 medido es unas **%s veces** menor que el peor caso del proceso por lotes (30 min).\n\n' \
     "$(improvement_factor "$BEFORE_WORST_CASE_MS" "$p95")"
+  printf 'La latencia está dominada por el intervalo del publicador del outbox (`fixedDelay` de 500 ms): al registrar\n'
+  printf 'las ventas en serie, el desfase respecto al sondeo forma un diente de sierra, y el mínimo varía entre\n'
+  printf 'ejecuciones (por ejemplo 96 ms en una y 265 ms en otra). Ver la spec global §6.\n\n'
   printf '## Muestras\n\n| # | Canal | Latencia (ms) |\n|---|---|---|\n'
   for sample in "$@"; do
     index=$((index + 1))
@@ -59,8 +64,10 @@ run_scenario() {
   log="$(mktemp)"
   printf '\n=== %s ===\n' "$name"
   start="$(now_ms)"
-  bash "$script" 2>&1 | tee "$log"
+  # tee ignora INT y TERM para seguir vivo hasta que el escenario termine de restaurar sus contenedores
+  bash "$script" 2>&1 | (trap '' INT TERM; tee "$log")
   status="${PIPESTATUS[0]}"
+  [[ "$status" == "130" || "$status" == "143" ]] && INTERRUPTED=1
   RESULT_NAMES+=("$name")
   RESULT_DURATION_MS+=("$(( $(now_ms) - start ))")
   if [[ "$status" == "0" ]]; then
