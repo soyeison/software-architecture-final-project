@@ -105,5 +105,15 @@ class SaleConcurrencyIntegrationTest extends PostgresIntegrationTest {
         assertThat(outcomes).allMatch(outcome -> outcome.status() == 201 || outcome.status() == 409);
         assertThat(successes).isBetween(1L, (long) initialStock);
         assertThat(storedQuantity(sku)).isEqualTo(initialStock - (int) successes).isNotNegative();
+        assertOneEventPerSuccessfulSaleInVersionOrder(sku, successes);
+    }
+
+    /** Un evento por venta confirmada y, por SKU, el orden de publicación coincide con el de las versiones. */
+    private void assertOneEventPerSuccessfulSaleInVersionOrder(String sku, long successes) {
+        List<Long> versions = jdbcTemplate.queryForList(
+                "SELECT (payload::jsonb ->> 'stockVersion')::bigint FROM outbox WHERE sku = ?"
+                        + " ORDER BY sequence_number", Long.class, sku);
+        assertThat(versions).hasSize((int) successes).isSorted();
+        assertThat(versions).doesNotHaveDuplicates();
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.retail.inventory.outbox.OutboxRecorder;
 import com.retail.inventory.stock.Channel;
 import com.retail.inventory.stock.SkuNotFoundException;
 import com.retail.inventory.stock.Stock;
@@ -30,13 +31,15 @@ public class RegisterSaleService {
     private final StockRepository stockRepository;
     private final TransactionTemplate transactionTemplate;
     private final OptimisticRetry optimisticRetry;
+    private final OutboxRecorder outboxRecorder;
     private final Clock clock;
 
     public RegisterSaleService(StockRepository stockRepository, TransactionTemplate transactionTemplate,
-            OptimisticRetry optimisticRetry, Clock clock) {
+            OptimisticRetry optimisticRetry, OutboxRecorder outboxRecorder, Clock clock) {
         this.stockRepository = stockRepository;
         this.transactionTemplate = transactionTemplate;
         this.optimisticRetry = optimisticRetry;
+        this.outboxRecorder = outboxRecorder;
         this.clock = clock;
     }
 
@@ -70,6 +73,10 @@ public class RegisterSaleService {
         stock.sell(quantity, now);
         // saveAndFlush fuerza la comprobación de versión dentro del intento y devuelve la versión posterior.
         Stock saved = stockRepository.saveAndFlush(stock);
-        return new StockChange(UUID.randomUUID(), sku, saved.getQuantity(), saved.getVersion(), channel, now);
+        StockChange change = new StockChange(UUID.randomUUID(), sku, saved.getQuantity(), saved.getVersion(),
+                channel, now);
+        // Misma transacción que el descuento: si el outbox falla, la venta entera se revierte.
+        outboxRecorder.record(change);
+        return change;
     }
 }
