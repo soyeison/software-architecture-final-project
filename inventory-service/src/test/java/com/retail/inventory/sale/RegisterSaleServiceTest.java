@@ -21,6 +21,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.retail.inventory.outbox.OutboxRecorder;
 import com.retail.inventory.stock.Channel;
 import com.retail.inventory.stock.Stock;
 import com.retail.inventory.stock.StockChange;
@@ -32,8 +33,9 @@ class RegisterSaleServiceTest {
 
     private final StockRepository stockRepository = mock(StockRepository.class);
     private final TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
+    private final OutboxRecorder outboxRecorder = mock(OutboxRecorder.class);
     private final RegisterSaleService service = new RegisterSaleService(stockRepository, transactionTemplate,
-            new OptimisticRetry(3), Clock.fixed(NOW, ZoneOffset.UTC));
+            new OptimisticRetry(3), outboxRecorder, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @SuppressWarnings("unchecked")
     private void runCallbacksInline() {
