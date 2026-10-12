@@ -11,11 +11,44 @@ spring:
     hibernate:
       # Flyway es el único dueño del esquema: una entidad desalineada impide el arranque.
       ddl-auto: validate
+  rabbitmq:
+    # Valores para correr desde el IDE; Compose los sobrescribe con SPRING_RABBITMQ_*.
+    host: localhost
+    port: 5672
+    username: retail
+    password: retail-demo
+    # Una caída de RabbitMQ no debe bloquear el arranque ni las consultas.
+    connection-timeout: 2s
+    listener:
+      simple:
+        # Ack manual: el listener confirma o rechaza cada mensaje explícitamente.
+        acknowledge-mode: manual
+        # UN solo consumidor con prefetch 1: la corrección de ApplyStockChangeService (no bloquea la fila del
+        # producto) y el orden por producto dependen de que los eventos se apliquen uno a uno. No cambiar.
+        concurrency: 1
+        max-concurrency: 1
+        prefetch: 1
+        # El servicio arranca aunque RabbitMQ o la cola no estén disponibles y consume cuando aparezcan.
+        missing-queues-fatal: false
+        auto-startup: true
+
+catalog:
+  consumer:
+    # La cola y su cola de mensajes rechazados (DLQ) las declara la infraestructura (infra/rabbitmq).
+    queue: catalog.inventory-stock-changed
+    # Espera creciente al reintentar un fallo transitorio: 1 s, 2 s, 4 s... hasta el tope.
+    initial-backoff: 1s
+    maximum-backoff: 30s
 
 server:
   port: 8082
 
 management:
+  health:
+    rabbit:
+      # Una caída de RabbitMQ no debe marcar el servicio como no sano: las consultas siguen funcionando
+      # y el listener se reconecta solo.
+      enabled: false
   endpoints:
     web:
       exposure:
