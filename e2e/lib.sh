@@ -200,7 +200,14 @@ publish_event() {
 }
 
 # catalog_log_count <patrón>: líneas del log del Catálogo que contienen el patrón (texto literal).
-catalog_log_count() { compose logs --no-color catalog-service 2>/dev/null | grep -c -F -- "$1"; }
+# Si no se pueden leer los logs (stack caído, servicio inexistente) devuelve 1 sin imprimir nada, para que
+# un "0 coincidencias" nunca pueda ser un falso positivo.
+catalog_log_count() {
+  local logs
+  logs="$(compose logs --no-color catalog-service 2>/dev/null)" || return 1
+  # grep -c imprime 0 y devuelve 1 cuando no hay coincidencias: no es un fallo.
+  grep -c -F -- "$1" <<<"$logs" || true
+}
 # catalog_log_count_is <patrón> <cantidad> (para wait_until)
 catalog_log_count_is() { [[ "$(catalog_log_count "$1")" == "$2" ]]; }
 

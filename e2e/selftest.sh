@@ -103,6 +103,20 @@ expect "management_publish_body: clave de enrutamiento" "$(jq -r '.routing_key' 
 expect "management_publish_body: codificación del cuerpo" "$(jq -r '.payload_encoding' <<<"$publish_body")" "string"
 expect "management_publish_body: mensaje persistente" "$(jq -r '.properties.delivery_mode' <<<"$publish_body")" "2"
 
+# --- catalog_log_count con `compose` simulado ---
+failing_logs_output="$(compose() { return 1; }; catalog_log_count X)"
+expect "catalog_log_count: si compose logs falla no imprime conteo" "$failing_logs_output" ""
+expect "catalog_log_count: si compose logs falla devuelve 1" \
+  "$(compose() { return 1; }; catalog_log_count X >/dev/null && echo yes || echo no)" "no"
+expect "catalog_log_count_is X 0: falso si compose logs falla" \
+  "$(compose() { return 1; }; catalog_log_count_is X 0 && echo yes || echo no)" "no"
+expect "catalog_log_count_is X 0: verdadero si el log no contiene el patrón" \
+  "$(compose() { printf 'linea uno\nlinea dos\n'; }; catalog_log_count_is X 0 && echo yes || echo no)" "yes"
+expect "catalog_log_count: cuenta las líneas con el patrón" \
+  "$(compose() { printf 'a X b\nnada\nX\n'; }; catalog_log_count X)" "2"
+expect "catalog_log_count: el patrón es texto literal (a.b no coincide con axb)" \
+  "$(compose() { printf 'axb\na.b\n'; }; catalog_log_count 'a.b')" "1"
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1
