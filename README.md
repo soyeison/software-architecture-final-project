@@ -12,6 +12,10 @@ docker-compose.yml        Infraestructura: RabbitMQ y una base PostgreSQL por se
 .env.example              Variables opcionales del Compose (copiar a .env)
 docs/contracts/           Contratos: OpenAPI, JSON Schema del evento (ver su README)
 docs/seed-data.md         Datos semilla compartidos por los servicios y los E2E
+docs/pruebas-de-escritorio.md  Los 11 escenarios: resultado esperado frente a obtenido y latencias medidas
+docs/guion-demo.md        Guion del video de la demo y checklist del ensayo
+docs/results/             Informes generados por los E2E (latencia)
+e2e/                      Escenarios de extremo a extremo y su ejecución completa (run-all.sh)
 docs/superpowers/specs/   Especificaciones de diseño
 docs/superpowers/plans/   Planes de implementación
 infra/rabbitmq/           Topología y configuración de RabbitMQ
