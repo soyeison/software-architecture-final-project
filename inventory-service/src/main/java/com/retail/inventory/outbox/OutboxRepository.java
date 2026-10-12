@@ -15,4 +15,9 @@ public interface OutboxRepository extends JpaRepository<OutboxEvent, Long> {
     @Query("select e from OutboxEvent e where e.status = com.retail.inventory.outbox.OutboxStatus.PENDING"
             + " order by e.sequenceNumber")
     List<OutboxEvent> findPending(Limit limit);
+
+    /** Los eventos más recientes primero (diagnóstico). */
+    List<OutboxEvent> findAllByOrderBySequenceNumberDesc(Limit limit);
+
+    List<OutboxEvent> findByStatusOrderBySequenceNumberDesc(OutboxStatus status, Limit limit);
 }
