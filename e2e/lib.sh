@@ -214,6 +214,78 @@ catalog_log_count() {
 # catalog_log_count_is <patrón> <cantidad> (para wait_until)
 catalog_log_count_is() { [[ "$(catalog_log_count "$1")" == "$2" ]]; }
 
+# --- Caídas de servicios (escenarios 05 y 08) y métricas ---
+
+# Servicios detenidos por el escenario y aún no restaurados (ver stop_service y restore_services).
+STOPPED_SERVICES=()
+
+# now_ms: milisegundos desde la época (para medir tiempos).
+now_ms() { date +%s%3N; }
+
+# metric <nombre> <valor>: imprime una métrica con un formato fijo que run-all.sh puede recoger.
+metric() { echo "METRIC $1=$2"; }
+
+# stop_service <servicio>: detiene un contenedor del Compose y lo registra para restaurarlo al salir.
+stop_service() {
+  compose stop "$1" >/dev/null 2>&1 || return 1
+  STOPPED_SERVICES+=("$1")
+}
+
+# start_service <servicio>: levanta el contenedor, espera a que esté sano y lo quita del registro.
+start_service() {
+  compose up -d --wait --wait-timeout 120 --no-recreate "$1" >/dev/null 2>&1 || return 1
+  local remaining=() service
+  for service in "${STOPPED_SERVICES[@]}"; do
+    [[ "$service" != "$1" ]] && remaining+=("$service")
+  done
+  STOPPED_SERVICES=("${remaining[@]}")
+}
+
+# restore_services: levanta todo lo que el escenario dejó detenido. Se usa como trap de salida.
+restore_services() {
+  local pending=("${STOPPED_SERVICES[@]}") service
+  for service in "${pending[@]}"; do
+    echo "Restaurando $service..." >&2
+    start_service "$service" || echo "FAIL: no se pudo restaurar $service; ejecuta e2e/reset.sh" >&2
+  done
+}
+
+# install_restore_trap: garantiza que los servicios detenidos se levanten aunque el escenario falle o se
+# interrumpa (Ctrl+C o señal de terminación).
+install_restore_trap() {
+  trap restore_services EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+}
+
+# queue_consumers <cola>: consumidores conectados a una cola (rabbitmqctl).
+queue_consumers() {
+  compose exec -T rabbitmq rabbitmqctl -q list_queues name consumers | awk -v q="$1" '$1 == q {print $2}' | tr -d '\r'
+}
+# queue_consumers_is <cola> <cantidad> (para wait_until)
+queue_consumers_is() { [[ "$(queue_consumers "$1")" == "$2" ]]; }
+
+# outbox_count_with_status <estado> <eventId...>: cuántos de esos eventos tienen ese estado en el outbox.
+outbox_count_with_status() {
+  local status="$1"
+  shift
+  curl -s --max-time 10 "$INVENTORY_URL/api/v1/inventory/outbox?status=$status" \
+    | jq --argjson ids "$(printf '%s\n' "$@" | jq -R . | jq -sc .)" \
+      '[.[] | select(.eventId as $id | $ids | index($id))] | length' 2>/dev/null
+}
+# outbox_count_with_status_is <estado> <cantidad> <eventId...> (para wait_until)
+outbox_count_with_status_is() { [[ "$(outbox_count_with_status "$1" "${@:3}")" == "$2" ]]; }
+
+# catalog_applied_sequence <sku> <eventId...>: de esos eventId, los que el Catálogo aplicó (líneas event_applied del
+# SKU), en el orden del log, uno por línea. Devuelve 1 si no puede leer el log.
+catalog_applied_sequence() {
+  local logs sku="$1"
+  shift
+  logs="$(compose logs --no-color catalog-service 2>/dev/null)" || return 1
+  grep -o -- "event_applied sku=$sku eventId=[0-9a-f-]*" <<<"$logs" | sed 's/.*eventId=//' \
+    | grep -Fx -f <(printf '%s\n' "$@") || true
+}
+
 # synced <sku>: éxito si el Catálogo muestra el mismo stock que Inventario; ambos deben ser enteros
 # (una consulta fallida deja vacío o null y no cuenta como coincidencia).
 synced() {
