@@ -2,6 +2,7 @@ package com.retail.inventory.error;
 
 import java.net.URI;
 import java.util.List;
+import java.util.stream.Stream;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -42,9 +43,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        List<FieldViolation> violations = exception.getBindingResult().getFieldErrors().stream()
-                .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
+        List<FieldViolation> fieldViolations = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldViolation(error.getField(), messageOrDefault(error.getDefaultMessage())))
                 .toList();
+        // Violaciones de clase (no de un campo): se reportan con el nombre del objeto como campo.
+        List<FieldViolation> objectViolations = exception.getBindingResult().getGlobalErrors().stream()
+                .map(error -> new FieldViolation(error.getObjectName(), messageOrDefault(error.getDefaultMessage())))
+                .toList();
+        List<FieldViolation> violations = Stream.concat(fieldViolations.stream(), objectViolations.stream()).toList();
         return validationProblem("The request has invalid fields", violations, request);
     }
 
@@ -76,7 +82,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         List<FieldViolation> violations = exception.getParameterValidationResults().stream()
                 .flatMap(result -> result.getResolvableErrors().stream()
                         .map(error -> new FieldViolation(result.getMethodParameter().getParameterName(),
-                                error.getDefaultMessage())))
+                                messageOrDefault(error.getDefaultMessage()))))
                 .toList();
         return validationProblem("The request has invalid parameters", violations, request);
     }
@@ -141,6 +147,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemType.VALIDATION_ERROR.toProblemDetail(detail, requestPath(request));
         problem.setProperty("errors", violations);
         return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    /** El schema exige {@code message}: si la restricción no trae texto, se usa uno genérico. */
+    private static String messageOrDefault(String message) {
+        return message != null ? message : "is invalid";
     }
 
     private static String requestPath(WebRequest request) {
