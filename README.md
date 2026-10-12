@@ -94,6 +94,21 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/inventory/TE
 
 Responde `200` con `{"sku":"TENIS-RUNNER-42","stock":5,"version":1,...}`. Un SKU inexistente responde `404 not-found`.
 
+Para registrar una venta (token `pos` u `online`):
+
+```bash
+TOKEN="$(scripts/generate-token.sh pos)"
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"quantity": 1, "channel": "POS"}' \
+  http://localhost:8081/api/v1/inventory/TENIS-RUNNER-42/sales
+```
+
+Responde `201` con el `saleId`, el stock restante y la versión. Sin unidades suficientes responde
+`409 insufficient-stock`; si varias ventas del mismo SKU chocan y se agotan los reintentos
+(`inventory.sale.max-attempts`, 5 por defecto), `409 concurrent-modification`. El cuerpo se valida de
+forma estricta: propiedades desconocidas o cantidades que no son enteros responden `400 validation-error`.
+Cada venta de la semilla es real: para volver al estado inicial, `docker compose down -v`.
+
 Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
 qué rutas existen. `/v3/api-docs` también se deniega; el contrato publicado es el de Swagger UI.
 
