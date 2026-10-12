@@ -14,7 +14,7 @@ class ClockConfigurationTest {
         Clock clock = new ClockConfiguration().clock();
 
         assertThat(clock.getZone()).isEqualTo(ZoneOffset.UTC);
-        for (int i = 0; i < 1000; i++) {
+        for (int index = 0; index < 1000; index++) {
             assertThat(clock.instant().getNano() % 1_000_000).isZero();
         }
     }
