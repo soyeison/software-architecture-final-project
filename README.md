@@ -111,10 +111,21 @@ Cada venta de la semilla es real: para volver al estado inicial, `docker compose
 
 Cada venta confirmada escribe, en la misma transacción que descuenta el stock, un evento
 `InventoryStockChanged` en la tabla `outbox` con estado `PENDING` (patrón Transactional Outbox). Si el
-outbox falla, la venta se revierte entera. Hasta la sub-tarea 4.6 nada lo publica a RabbitMQ; para verlo:
+outbox falla, la venta se revierte entera. Un publicador interno revisa el outbox cada 500 ms y envía los eventos PENDING a RabbitMQ (exchange
+`inventory.events`), esperando la confirmación del broker; si RabbitMQ está caído, la venta sigue
+funcionando y el evento queda PENDING hasta que vuelva (cero eventos perdidos, en orden). Para verlo
+(público, solo para la demo):
 
 ```bash
-docker compose exec inventory-db psql -U inventory -d inventory -c "SELECT sequence_number, event_id, sku, status, attempts FROM outbox"
+curl -s "http://localhost:8081/api/v1/inventory/outbox?status=PENDING"   # eventos sin publicar
+curl -s "http://localhost:8081/api/v1/inventory/outbox"                  # los 50 más recientes
+```
+
+Prueba de humo del servicio dentro de Compose (venta → outbox PUBLISHED → mensaje en la cola del
+Catálogo; usa su propio proyecto y puertos, requiere Docker, curl y jq):
+
+```bash
+scripts/smoke-inventory-service.sh
 ```
 
 Las rutas no declaradas responden 401 (sin token) o 403 (con token), no 404: el servicio no revela
@@ -127,6 +138,7 @@ Requiere Docker; la verificación de la infraestructura también necesita `curl`
 ```bash
 scripts/verify-contracts.sh   # contratos: OpenAPI, schema del evento y topología de RabbitMQ
 scripts/verify-infra.sh       # infraestructura: Compose, credenciales, redes y persistencia (~1,5 min)
+scripts/smoke-inventory-service.sh   # servicio de Inventario en Compose: venta, outbox y cola (fase 4)
 ```
 
 `verify-infra.sh` usa su propio proyecto (`retail-verify`) y sus propios puertos, de modo que puede

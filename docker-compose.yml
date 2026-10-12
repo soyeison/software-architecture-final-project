@@ -64,6 +64,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://inventory-db:5432/inventory
       SPRING_DATASOURCE_USERNAME: inventory
       SPRING_DATASOURCE_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory-demo}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: retail
+      SPRING_RABBITMQ_PASSWORD: retail-demo
       JWT_SECRET: ${JWT_SECRET:-retail-demo-jwt-secret-not-for-production-use}
     ports:
       - "127.0.0.1:${INVENTORY_SERVICE_PORT:-8081}:8081"
