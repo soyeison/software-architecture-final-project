@@ -129,13 +129,22 @@ CREATE TABLE products (
 );
 ```
 
-La 5.2 crea `products` (`V1__create_products.sql`) y su semilla (`V2__seed_products.sql`); `processed_events` se crea en la 5.3 (`V3__create_processed_events.sql`), cuando el código la usa.
+La 5.2 crea `products` (`V1__create_products.sql`) y su semilla (`V2__seed_products.sql`); `processed_events` se crea en la 5.3 (`V3__create_processed_events.sql`), cuando el código la usa:
+
+```sql
+CREATE TABLE processed_events (
+  event_id     UUID         PRIMARY KEY,
+  processed_at TIMESTAMPTZ  NOT NULL
+);
+```
+
+Sirve para deduplicar por `eventId` en la misma transacción que aplica el evento; la clave primaria es la
+red de seguridad frente a duplicados simultáneos (§6). Crece sin límite; para la demo no se purga (YAGNI).
 
 - `V2__seed_products.sql` siembra los 7 SKU de `docs/seed-data.md` con nombre, precio y stock;
   `stock_version = 0` (de modo que cualquier primer evento, con `stockVersion >= 1`, se aplique),
   `updated_at` igual a la hora del sembrado y `last_event_latency_ms = NULL`. Las **descripciones** solo
   viven en la migración (el documento no las trae).
-- `processed_events` crece sin límite; para la demo no se purga (YAGNI).
 
 ### Entidad `Product`
 
@@ -276,7 +285,7 @@ RabbitMQ. Nunca hay una copia a mano en el repositorio.
 | | Entrega | Cómo se comprueba | Escenarios |
 |---|---|---|---|
 | **5.1** | Servicio que arranca en Compose, Swagger UI con el contrato, errores base, logging, reloj, Dockerfile sin root, `.dockerignore`, `CATALOG_SERVICE_PORT` y prueba de arquitectura | `docker compose up`, `./mvnw verify` | — |
-| **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}`; retirar `allowEmptyShould` de las reglas 3 y 4 de ArchUnit; decidir qué se publica en `/v3/api-docs` (el contrato publicado es el escrito a mano: aclararlo en el README o limitar la generación con `springdoc.paths-to-match`); el contrato publicado es el de Swagger UI y `/v3/api-docs` es solo informativo (aclarado en el README); reglas 3 y 4 de ArchUnit sin evaluación vacía | Respuesta contra el contrato; semilla igual al documento | consulta |
+| **5.2** | Migraciones, semilla y `GET /products` y `/products/{sku}`; el contrato publicado es el de Swagger UI y `/v3/api-docs` es solo informativo (aclarado en el README); reglas 3 y 4 de ArchUnit sin evaluación vacía | Respuesta contra el contrato; semilla igual al documento | consulta |
 | **5.3** | `ApplyStockChangeService`, `ProcessedEvent`, evento tolerante y validado | PostgreSQL real: aplicar, duplicado, viejo, SKU desconocido, atomicidad | 9 (a nivel de servicio) |
 | **5.4** | `CatalogProperties` (primeras propiedades reales: espera del reintento y nombre de la cola), salud sin RabbitMQ, listener con ack manual, clasificación, reintento con espera creciente, DLQ; prueba de humo del flujo venta → Catálogo | RabbitMQ real: flujo completo, escenarios 5 y 9, DLQ; `scripts/smoke-catalog-service.sh` | 1, 5, 9 (lado Catálogo) |
 
