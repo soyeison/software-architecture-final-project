@@ -23,7 +23,7 @@ class StockRepositoryIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void persistsAndReadsBackTheStock() {
-        String sku = "TEST-" + UUID.randomUUID();
+        String sku = "TEST-" + UUID.randomUUID().toString().toUpperCase();
         stockRepository.saveAndFlush(new Stock(sku, 7, Instant.parse("2026-10-11T10:00:00Z")));
 
         Stock found = stockRepository.findById(sku).orElseThrow();
@@ -36,7 +36,7 @@ class StockRepositoryIntegrationTest extends PostgresIntegrationTest {
     /** El mecanismo del escenario 3: dos ventas concurrentes sobre la misma lectura. */
     @Test
     void secondConcurrentUpdateFailsWithOptimisticLockingFailure() {
-        String sku = "TEST-" + UUID.randomUUID();
+        String sku = "TEST-" + UUID.randomUUID().toString().toUpperCase();
         stockRepository.saveAndFlush(new Stock(sku, 5, Instant.parse("2026-10-11T10:00:00Z")));
         Stock firstCopy = stockRepository.findById(sku).orElseThrow();
         Stock secondCopy = stockRepository.findById(sku).orElseThrow();
@@ -53,13 +53,13 @@ class StockRepositoryIntegrationTest extends PostgresIntegrationTest {
     @Test
     void databaseRejectsNegativeQuantityEvenIfTheCodeAllowedIt() {
         assertThatThrownBy(() -> stockRepository.saveAndFlush(
-                new Stock("TEST-" + UUID.randomUUID(), -1, Instant.parse("2026-10-11T10:00:00Z"))))
+                new Stock("TEST-" + UUID.randomUUID().toString().toUpperCase(), -1, Instant.parse("2026-10-11T10:00:00Z"))))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void versionIncreasesOnEveryUpdate() {
-        String sku = "TEST-" + UUID.randomUUID();
+        String sku = "TEST-" + UUID.randomUUID().toString().toUpperCase();
         Stock stock = stockRepository.saveAndFlush(new Stock(sku, 5, Instant.parse("2026-10-11T10:00:00Z")));
         long initialVersion = stock.getVersion();
 

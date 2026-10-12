@@ -230,7 +230,7 @@ patrón responde 404 porque no existe en la tabla, sin validación extra.
   - `GET /{sku}`: 200 con forma validada contra el contrato, 404 y 401/403;
   - **la semilla coincide con `docs/seed-data.md`**: una prueba lee la tabla del documento y la compara
     con lo sembrado, para evitar el desalineamiento entre Inventario y Catálogo.
-- Los tests que modifican stock usan **sus propios SKU** (`TEST-<uuid>`) y no tocan la semilla.
+- Los tests que modifican stock usan **sus propios SKU** (`TEST-<UUID en mayúsculas>`, para cumplir el patrón del contrato) y no tocan la semilla.
 
 ## 7. Venta y concurrencia (sub-tarea 4.4)
 
@@ -407,7 +407,7 @@ sub-tarea responsable y su plan debe incluirlo.
 | Pendiente | Sub-tarea |
 |---|---|
 | `validation-error` con `message` nulo o con violaciones de clase (no solo de campo) | 4.4 |
-| `SeedDataIntegrationTest` asume que ninguna prueba modifica los SKU sembrados: las pruebas de venta deben usar SKU `TEST-<uuid>` (`TestStocks.insert`); `GenerateTokenScriptIntegrationTest.posAndOnlineTokensCanSell` vende `TENIS-RUNNER-42` y debe pasar a un SKU propio | 4.4 |
+| `SeedDataIntegrationTest` asume que ninguna prueba modifica los SKU sembrados: toda prueba que envíe una venta (la matriz de seguridad incluida) debe usar un SKU creado con `TestStocks.insert`. Afecta a `GenerateTokenScriptIntegrationTest.posAndOnlineTokensCanSell` y a `SecurityIntegrationTest.saleWithSellScopeIsAllowed`, que venden `TENIS-RUNNER-42` y bajarán la semilla cuando `SaleController` reemplace la sonda | 4.4 |
 | El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
 | El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
 | Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |

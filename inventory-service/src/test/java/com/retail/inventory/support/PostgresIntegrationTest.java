@@ -22,5 +22,7 @@ public abstract class PostgresIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        // Limita el pool: con muchos contextos de Spring en caché, el valor por defecto agotaría las conexiones de PostgreSQL.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> 5);
     }
 }
