@@ -25,7 +25,7 @@ La observabilidad básica **sí está incluida**: logs con `sku` y `eventId` (se
 `/actuator/health` y el diagnóstico del outbox (`GET /outbox`). La métrica del documento final, la
 latencia de propagación, no depende de métricas del servicio: Inventario pone `occurredAt` en el
 evento, el Catálogo calcula `updatedAt − occurredAt` (campo `lastEventLatencyMs` y logs) y
-`e2e/measure-latency.sh` (fase 6) la resume.
+`e2e/11-latency.sh` (fase 6) la resume.
 
 ## 2. Principios de diseño
 
