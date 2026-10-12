@@ -47,6 +47,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void classLevelViolationIsReportedAsValidationProblemWithTheObjectAsField() throws Exception {
+        String body = mockMvc.perform(post("/probe/range")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"from\": 5, \"to\": 1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "validation-error"))
+                .andExpect(jsonPath("$.errors[0].field").value("rangeRequest"))
+                .andExpect(jsonPath("$.errors[0].message").value("from must not be greater than to"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "ValidationProblem");
+    }
+
+    @Test
     void malformedJsonReturnsValidationProblemWithEmptyErrors() throws Exception {
         String body = mockMvc.perform(post("/probe/echo")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -65,6 +79,17 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "not-found"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "Problem");
+    }
+
+    @Test
+    void exhaustedRetriesReturnConcurrentModificationConflict() throws Exception {
+        String body = mockMvc.perform(get("/probe/conflict"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "concurrent-modification"))
                 .andReturn().getResponse().getContentAsString();
 
         assertMatchesSchema(body, "Problem");

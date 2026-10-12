@@ -115,6 +115,7 @@ Una clase de prueba en la sub-tarea 4.1 hace cumplir las reglas y falla si algui
 - Un error inesperado responde `internal-error` sin detalles internos y se registra completo. Un
   JSON mal formado responde `validation-error` con `errors: []`.
 - Las excepciones estándar de Spring MVC (405, 415, ...) conservan su estado y reciben el tipo genérico `http-error`; los parámetros faltantes, de tipo incorrecto o que violan una restricción responden `validation-error` con `errors`.
+- Las violaciones de clase (no de un campo) de un cuerpo inválido se reportan en `errors` con el nombre del objeto como `field`, y una restricción sin texto usa el mensaje `is invalid`.
 
 ### Logging
 
@@ -185,7 +186,7 @@ respuesta 401 del OpenAPI en esta sub-tarea (cambio compatible del contrato).
 - Matriz: sin token y token inválido → 401; sin el scope → 403; con el scope → pasa; token expirado
   y emisor incorrecto → 401; `outbox` público.
 - En 4.2 aún no hay endpoints reales: se usa un controlador de prueba solo en `src/test` con las
-  mismas rutas. La 4.3 retiró la ruta `GET /{sku}`, la 4.4 retirará la de `POST …/sales` y la 4.6 la de `GET /outbox`; las pruebas pasan a los endpoints reales.
+  mismas rutas. La 4.3 retiró la ruta `GET /{sku}`, la 4.4 retiró la de `POST …/sales` y la 4.6 la de `GET /outbox`; las pruebas pasan a los endpoints reales.
 - Las pruebas del manejador de errores (de 4.1) desactivan los filtros de seguridad
   (`addFilters = false`): prueban solo el manejo de errores, y la seguridad se prueba aparte con su
   propia matriz.
@@ -263,7 +264,7 @@ SaleController          valida el cuerpo (cantidad ≥ 1, canal válido) y llama
 - El servicio devuelve un `StockChange`; el controlador arma el `SaleResponse` con la petición y ese
   resultado, sin clase intermedia.
 - **Entrada estricta, como dice el contrato:** Jackson rechaza propiedades desconocidas y no convierte
-  `1.5` ni `"1"` en entero.
+  `1.5` ni `"1"` en entero ni acepta números como valor de un enum (`"channel": 0`); se configura con cuatro opciones de Jackson en application.yml (fail-on-unknown-properties, accept-float-as-int, allow-coercion-of-scalars y datatype.enum.fail-on-numbers-for-enums, que en Jackson 3 es una EnumFeature), las cuatro necesarias.
 - **4.4 no escribe el evento:** la sub-tarea 4.5 agrega la llamada a `OutboxRecorder` dentro de la misma
   transacción.
 
@@ -406,8 +407,6 @@ sub-tarea responsable y su plan debe incluirlo.
 
 | Pendiente | Sub-tarea |
 |---|---|
-| `validation-error` con `message` nulo o con violaciones de clase (no solo de campo) | 4.4 |
-| `SeedDataIntegrationTest` asume que ninguna prueba modifica los SKU sembrados: toda prueba que envíe una venta (la matriz de seguridad incluida) debe usar un SKU creado con `TestStocks.insert`. Afecta a `GenerateTokenScriptIntegrationTest.posAndOnlineTokensCanSell` y a `SecurityIntegrationTest.saleWithSellScopeIsAllowed`, que venden `TENIS-RUNNER-42` y bajarán la semilla cuando `SaleController` reemplace la sonda | 4.4 |
 | El healthcheck pasa a DOWN si RabbitMQ cae, lo que marcaría el servicio como no sano en el escenario 8 (desactivar el indicador de RabbitMQ o usar un grupo de salud sin él) | 4.6 |
 | El contenedor se ejecuta como root (agregar un usuario sin privilegios) | 4.6 |
 | Agregar `catalog-service` al `.dockerignore` de la raíz | Fase 5 |

@@ -4,10 +4,12 @@ import java.nio.charset.StandardCharsets;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -16,7 +18,13 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "inventory")
-public record InventoryProperties(@Valid @NotNull Jwt jwt) {
+public record InventoryProperties(@Valid @NotNull Jwt jwt, @Valid @DefaultValue Sale sale) {
+
+    /**
+     * Parámetros de la venta: intentos máximos ante conflictos de versión (bloqueo optimista).
+     */
+    public record Sale(@DefaultValue("5") @Min(1) int maxAttempts) {
+    }
 
     /**
      * Parámetros del JWT. El secreto llega por la variable de entorno {@code JWT_SECRET}.

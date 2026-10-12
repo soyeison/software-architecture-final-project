@@ -30,6 +30,22 @@ class InventoryPropertiesTest {
     }
 
     @Test
+    void saleMaxAttemptsDefaultsToFive() {
+        contextRunner.withPropertyValues("inventory.jwt.secret=" + SECRET_OF_32_BYTES)
+                .run(context -> assertThat(context.getBean(InventoryProperties.class).sale().maxAttempts())
+                        .isEqualTo(5));
+    }
+
+    @Test
+    void saleMaxAttemptsCanBeConfiguredButNotBelowOne() {
+        contextRunner.withPropertyValues("inventory.jwt.secret=" + SECRET_OF_32_BYTES, "inventory.sale.max-attempts=3")
+                .run(context -> assertThat(context.getBean(InventoryProperties.class).sale().maxAttempts())
+                        .isEqualTo(3));
+        contextRunner.withPropertyValues("inventory.jwt.secret=" + SECRET_OF_32_BYTES, "inventory.sale.max-attempts=0")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
     void failsToStartWhenSecretIsMissing() {
         contextRunner.withPropertyValues("inventory.jwt.secret=")
                 .run(context -> assertThat(context).hasFailed()

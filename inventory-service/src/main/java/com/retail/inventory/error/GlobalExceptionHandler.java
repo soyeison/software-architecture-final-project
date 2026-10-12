@@ -2,6 +2,7 @@ package com.retail.inventory.error;
 
 import java.net.URI;
 import java.util.List;
+import java.util.stream.Stream;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -24,6 +25,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.retail.inventory.sale.StockConflictException;
+import com.retail.inventory.stock.InsufficientStockException;
 import com.retail.inventory.stock.SkuNotFoundException;
 
 /**
@@ -40,9 +43,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        List<FieldViolation> violations = exception.getBindingResult().getFieldErrors().stream()
-                .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
+        List<FieldViolation> fieldViolations = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldViolation(error.getField(), messageOrDefault(error.getDefaultMessage())))
                 .toList();
+        // Violaciones de clase (no de un campo): se reportan con el nombre del objeto como campo.
+        List<FieldViolation> objectViolations = exception.getBindingResult().getGlobalErrors().stream()
+                .map(error -> new FieldViolation(error.getObjectName(), messageOrDefault(error.getDefaultMessage())))
+                .toList();
+        List<FieldViolation> violations = Stream.concat(fieldViolations.stream(), objectViolations.stream()).toList();
         return validationProblem("The request has invalid fields", violations, request);
     }
 
@@ -74,7 +82,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         List<FieldViolation> violations = exception.getParameterValidationResults().stream()
                 .flatMap(result -> result.getResolvableErrors().stream()
                         .map(error -> new FieldViolation(result.getMethodParameter().getParameterName(),
-                                error.getDefaultMessage())))
+                                messageOrDefault(error.getDefaultMessage()))))
                 .toList();
         return validationProblem("The request has invalid parameters", violations, request);
     }
@@ -91,6 +99,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ProblemDetail> handleSkuNotFound(SkuNotFoundException exception,
             HttpServletRequest request) {
         ProblemDetail problem = ProblemType.NOT_FOUND.toProblemDetail(exception.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ProblemDetail> handleInsufficientStock(InsufficientStockException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemType.INSUFFICIENT_STOCK
+                .toProblemDetail(exception.getMessage(), request.getRequestURI());
+        problem.setProperty("availableStock", exception.getAvailableStock());
+        problem.setProperty("requestedQuantity", exception.getRequestedQuantity());
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    @ExceptionHandler(StockConflictException.class)
+    public ResponseEntity<ProblemDetail> handleStockConflict(StockConflictException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = ProblemType.CONCURRENT_MODIFICATION
+                .toProblemDetail("Stock changed concurrently, please retry", request.getRequestURI());
         return ResponseEntity.status(problem.getStatus()).body(problem);
     }
 
@@ -121,6 +147,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemType.VALIDATION_ERROR.toProblemDetail(detail, requestPath(request));
         problem.setProperty("errors", violations);
         return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    /** El schema exige {@code message}: si la restricción no trae texto, se usa uno genérico. */
+    private static String messageOrDefault(String message) {
+        return message != null ? message : "is invalid";
     }
 
     private static String requestPath(WebRequest request) {
