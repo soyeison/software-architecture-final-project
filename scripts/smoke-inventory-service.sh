@@ -34,7 +34,7 @@ else
   echo "FAIL: inventory-service no llegó a healthy"; echo "$up_output"; docker compose logs --tail 50 inventory-service; exit 1
 fi
 container_user="$(docker compose exec -T inventory-service id -u | tr -d '\r')"
-check "el contenedor no corre como root" "$([[ "$container_user" != "0" ]] && echo yes || echo no)" "yes"
+check "el contenedor no corre como root" "$([[ "$container_user" =~ ^[0-9]+$ && "$container_user" != "0" ]] && echo yes || echo no)" "yes"
 
 echo "== Venta =="
 token="$("$ROOT/scripts/generate-token.sh" pos)"

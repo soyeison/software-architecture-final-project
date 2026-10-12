@@ -20,7 +20,9 @@ import com.retail.inventory.config.InventoryProperties;
 /**
  * Envía los bytes del JSON tal cual al exchange {@code inventory.events}. Solo cuenta como enviado si el
  * broker confirma (<i>publisher confirms</i>) y el mensaje no fue devuelto por no tener cola
- * ({@code mandatory}). Es la única clase que usa {@code org.springframework.amqp}.
+ * ({@code mandatory}). La entrega es al menos una vez: puede haber duplicados (confirm expirado con el
+ * mensaje ya entregado, marcado fallido tras el envío, apagado durante la espera); los consumidores deben
+ * deduplicar por {@code eventId}. Es la única clase que usa {@code org.springframework.amqp}.
  */
 @Component
 public class RabbitStockEventSender implements StockEventSender {

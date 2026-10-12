@@ -113,7 +113,7 @@ Cada venta confirmada escribe, en la misma transacción que descuenta el stock, 
 `InventoryStockChanged` en la tabla `outbox` con estado `PENDING` (patrón Transactional Outbox). Si el
 outbox falla, la venta se revierte entera. Un publicador interno revisa el outbox cada 500 ms y envía los eventos PENDING a RabbitMQ (exchange
 `inventory.events`), esperando la confirmación del broker; si RabbitMQ está caído, la venta sigue
-funcionando y el evento queda PENDING hasta que vuelva (cero eventos perdidos, en orden). Para verlo
+funcionando y el evento queda PENDING hasta que vuelva (cero eventos perdidos, en orden por producto). Para verlo
 (público, solo para la demo):
 
 ```bash

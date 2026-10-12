@@ -28,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import com.retail.inventory.support.RabbitIntegrationTest;
@@ -78,6 +79,17 @@ class OutboxPublishingIntegrationTest extends RabbitIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
+    private Message receiveWithMessageId(String messageId, Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            Message message = rabbitTemplate.receive(QUEUE, 500);
+            if (message != null && messageId.equals(message.getMessageProperties().getMessageId())) {
+                return message;
+            }
+        }
+        return null;
+    }
+
     private Map<String, Object> outboxRow(String sku, long stockVersion) {
         return jdbcTemplate.queryForMap("SELECT status, attempts, last_error, published_at, payload FROM outbox"
                 + " WHERE sku = ? AND (payload::jsonb ->> 'stockVersion')::bigint = ?", sku, stockVersion);
@@ -91,7 +103,8 @@ class OutboxPublishingIntegrationTest extends RabbitIntegrationTest {
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(
                 () -> assertThat(outboxRow(sku, 2L).get("status")).isEqualTo("PUBLISHED"));
-        Message message = rabbitTemplate.receive(QUEUE, 5000);
+        // Ignora mensajes ajenos a esta prueba: busca el de la venta por su messageId.
+        Message message = receiveWithMessageId(saleId, Duration.ofSeconds(10));
         assertThat(message).isNotNull();
         String body = new String(message.getBody(), StandardCharsets.UTF_8);
         assertMatchesEventSchema(body);
@@ -126,11 +139,14 @@ class OutboxPublishingIntegrationTest extends RabbitIntegrationTest {
             assertThat(outboxRow(sku, 3L).get("status")).isEqualTo("PUBLISHED");
             assertThat(outboxRow(sku, 4L).get("status")).isEqualTo("PUBLISHED");
         });
+        // Solo cuentan los mensajes de este SKU: cualquier otro se ignora.
         List<Long> versions = new ArrayList<>();
         Message message;
         while ((message = rabbitTemplate.receive(QUEUE, 2000)) != null) {
-            versions.add(jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8))
-                    .get("stockVersion").asLong());
+            JsonNode event = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
+            if (sku.equals(event.get("sku").asString())) {
+                versions.add(event.get("stockVersion").asLong());
+            }
         }
         assertThat(versions).containsExactly(2L, 3L, 4L);
     }

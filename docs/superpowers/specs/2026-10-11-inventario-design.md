@@ -302,7 +302,8 @@ CREATE INDEX outbox_pending_index ON outbox (sequence_number) WHERE status = 'PE
 ```
 
 - `sequence_number` fija el orden de publicación. Para un mismo SKU el orden es el de confirmación: la
-  segunda venta espera la fila de stock de la primera, así que su inserción ocurre después. Entre SKU
+  segunda venta espera el bloqueo de la fila de stock, falla la verificación de versión y reintenta; el
+  INSERT del reintento es el que ocurre después del commit de la primera. Entre SKU
   distintos el orden no importa, porque el Catálogo guarda la versión por producto.
 - `StockEventFactory` genera el JSON a partir del `StockChange` y **formatea `occurredAt` con exactamente
   3 decimales** en UTC, aunque los milisegundos sean cero.
@@ -336,7 +337,7 @@ OutboxRelay (@Scheduled fixedDelay 500 ms)
   `status`. Un valor desconocido responde `validation-error`.
 - Propiedades: `inventory.outbox.poll-interval` (500 ms), `batch-size` (50), `confirm-timeout` (5 s) y
   `relay-enabled` (por defecto `true`; las pruebas lo apagan para controlar cuándo corre el relay).
-- El relay corre en una sola instancia (`fixedDelay`); `OutboxEvent` no tiene `@Version` porque nadie más modifica la fila. Escalar a varias instancias exigiría `SELECT ... FOR UPDATE SKIP LOCKED`.
+- El relay corre en una sola instancia (`fixedDelay`); `OutboxEvent` no tiene `@Version` porque nadie más modifica la fila. Para varias instancias, `SKIP LOCKED` por sí solo rompería el orden por SKU (la instancia 2 saltaría un A#n bloqueado y publicaría A#n+1): habría que usar un único relay activo (elección de líder o un lock) o particionar por SKU.
 
 ### Pruebas
 

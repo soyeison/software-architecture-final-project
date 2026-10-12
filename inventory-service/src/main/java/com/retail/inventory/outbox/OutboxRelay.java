@@ -53,7 +53,13 @@ public class OutboxRelay {
                     return published;
                 }
                 event.markPublished(clock.instant());
-                outboxRepository.save(event);
+                try {
+                    outboxRepository.save(event);
+                } catch (RuntimeException exception) {
+                    LOGGER.warn("outbox_mark_published_failed eventId={} sku={} (will be re-sent)",
+                            event.getEventId(), event.getSku(), exception);
+                    throw exception;
+                }
                 published++;
                 LOGGER.info("outbox_published eventId={} sku={}", event.getEventId(), event.getSku());
             }

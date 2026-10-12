@@ -1,7 +1,9 @@
 package com.retail.inventory.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,10 +16,14 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.domain.Limit;
 
 import com.retail.inventory.config.InventoryProperties;
 
+@ExtendWith(OutputCaptureExtension.class)
 class OutboxRelayTest {
 
     private static final Instant NOW = Instant.parse("2026-10-12T10:00:00Z");
@@ -88,6 +94,21 @@ class OutboxRelayTest {
         assertThat(sender.sent).containsExactly(first.getEventId(), second.getEventId());
         assertThat(first.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
         assertThat(first.getAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void ifMarkingAsPublishedFailsAfterASuccessfulSendItLogsTheEventAndRethrows(CapturedOutput output) {
+        OutboxEvent event = event("A");
+        when(outboxRepository.findPending(any(Limit.class))).thenReturn(List.of(event));
+        IllegalStateException failure = new IllegalStateException("db down");
+        doThrow(failure).when(outboxRepository).save(event);
+
+        assertThatThrownBy(relay::publishPending).isSameAs(failure);
+
+        assertThat(sender.sent).containsExactly(event.getEventId());
+        // Solo en memoria: la persistencia falló, el evento seguirá PENDING en la base y se reenviará.
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
+        assertThat(output).contains("outbox_mark_published_failed eventId=" + event.getEventId() + " sku=A");
     }
 
     @Test
