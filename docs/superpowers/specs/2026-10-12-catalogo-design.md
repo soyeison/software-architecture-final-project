@@ -55,8 +55,7 @@ com.retail.catalog
 ├── product/      Product, ProductRepository, ProductQueryService, ProductController,
 │                 ProductResponse, ProductNotFoundException
 └── stockevent/   StockChangedEvent, StockEventReader, StockEventListener, ApplyStockChangeService,
-                  ApplyResult,
-                  ProcessedEvent, ProcessedEventRepository,
+                  ApplyResult, ProcessedEvent, ProcessedEventRepository,
                   InvalidEventException, UnknownProductException
 ```
 
@@ -238,8 +237,8 @@ del `content_type`). Clasifica cada fallo según su causa:
 - Una base de pruebas compartida por ejecución (`PostgresIntegrationTest`) y otra con RabbitMQ
   (`RabbitIntegrationTest`), como en Inventario. Las clases que dependen de filas ajenas las vacían
   (`TRUNCATE`) en `@BeforeEach` (cada clase vacía solo la tabla que le corresponde, por ejemplo
-  `processed_events`, nunca `products` ni los SKU sembrados; ver la regla de 5.3 y 5.4); un contexto con el listener activo que no deba sobrevivir a su clase usa
-  `@DirtiesContext`.
+  `processed_events`, nunca `products` ni los SKU sembrados; ver la regla de 5.3 y 5.4); un contexto con el
+  listener activo que no deba sobrevivir a su clase usa `@DirtiesContext`.
 - Las pruebas de integración de 5.3 y 5.4 usan productos `TEST-<UUID>` y solo vacían `processed_events`
   (`TRUNCATE`); nunca vacían `products` ni modifican los SKU sembrados, porque `SeedDataIntegrationTest` y
   `ProductEndpointIntegrationTest` dependen de la semilla intacta y todas las clases comparten una base.
@@ -312,6 +311,8 @@ verificado en Inventario.
 |---|---|
 | `URI.create(requestPath)` en `GlobalExceptionHandler` y `ProblemType` de **Inventario** lanza si la ruta trae `[` o `]` (corregido en el Catálogo en la 5.2 con `ProblemType.toInstance`, que usa `UriComponentsBuilder.fromPath(...).build().encode()`; aplicar lo mismo en Inventario) | Cualquier cambio futuro en Inventario |
 | Endurecer la regla 2 de ArchUnit (`StockEventListener` por nombre simple) restringiéndola también al paquete `stockevent` | 5.4 |
+| La corrección de `ApplyStockChangeService` depende de `concurrency` 1 y `prefetch` 1 (no bloquea la fila de `Product`): fijarlos en la configuración con un comentario que lo explique, y tratar `DataIntegrityViolationException` (carrera de duplicados por `eventId`) como transitoria | 5.4 |
+| El MDC `sku`/`eventId` de `apply()` se borra al salir y el log `event_applied` se emite antes del commit: decidir en el listener quién maneja el MDC y cuándo se registra el log | 5.4 |
 | `ClockConfigurationTest` de Inventario usa la variable de bucle `i` en lugar de `index` | Cualquier cambio futuro en Inventario |
 
 ### Cierre de la fase 5
