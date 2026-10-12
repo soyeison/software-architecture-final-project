@@ -71,6 +71,38 @@ expect "synced: ambos vacíos" "$(synced_with '' '')" "no"
 expect "synced: ambos null" "$(synced_with null null)" "no"
 expect "synced: catálogo vacío e Inventario entero" "$(synced_with '' 5)" "no"
 
+# --- Inyección de eventos (sin Docker) ---
+identifier="$(new_uuid)"
+expect "new_uuid: formato UUID" \
+  "$([[ "$identifier" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] && echo yes || echo no)" "yes"
+expect "new_uuid: dos valores distintos" "$([[ "$(new_uuid)" != "$(new_uuid)" ]] && echo yes || echo no)" "yes"
+
+first_base="$(version_base)"
+expect "version_base: milisegundos desde la época (13 dígitos)" \
+  "$([[ "$first_base" =~ ^[0-9]{13}$ ]] && echo yes || echo no)" "yes"
+sleep 0.01
+expect "version_base: crece con el tiempo" "$([[ "$(version_base)" -gt "$first_base" ]] && echo yes || echo no)" "yes"
+
+event="$(build_event "$identifier" "CALCETINES-PACK-3" 15 "$first_base" ONLINE)"
+expect "build_event: JSON válido con los 7 campos del contrato" \
+  "$(jq -r '[.eventId, .eventType, .sku, .newStock, .stockVersion, .channel, .occurredAt] | map(select(. != null)) | length' <<<"$event")" "7"
+expect "build_event: eventType" "$(jq -r '.eventType' <<<"$event")" "InventoryStockChanged"
+expect "build_event: eventId" "$(jq -r '.eventId' <<<"$event")" "$identifier"
+expect "build_event: newStock es un número" "$(jq -r '.newStock | type' <<<"$event")" "number"
+expect "build_event: stockVersion es un número con el valor dado" "$(jq -r '.stockVersion' <<<"$event")" "$first_base"
+expect "build_event: canal indicado" "$(jq -r '.channel' <<<"$event")" "ONLINE"
+expect "build_event: canal por defecto POS" "$(build_event "$identifier" X 1 1 | jq -r '.channel')" "POS"
+expect "build_event: occurredAt en UTC con milisegundos" \
+  "$([[ "$(jq -r '.occurredAt' <<<"$event")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$ ]] && echo yes || echo no)" "yes"
+
+awkward_body=$'{"a": "con \\"comillas\\"",\n "b": 1}'
+publish_body="$(management_publish_body "$awkward_body")"
+expect "management_publish_body: conserva el cuerpo tal cual (comillas y saltos de línea)" \
+  "$(jq -r '.payload' <<<"$publish_body")" "$awkward_body"
+expect "management_publish_body: clave de enrutamiento" "$(jq -r '.routing_key' <<<"$publish_body")" "inventory.stock.changed"
+expect "management_publish_body: codificación del cuerpo" "$(jq -r '.payload_encoding' <<<"$publish_body")" "string"
+expect "management_publish_body: mensaje persistente" "$(jq -r '.properties.delivery_mode' <<<"$publish_body")" "2"
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1

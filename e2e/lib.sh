@@ -7,6 +7,12 @@ INVENTORY_URL="${INVENTORY_URL:-http://127.0.0.1:${INVENTORY_SERVICE_PORT:-8081}
 CATALOG_URL="${CATALOG_URL:-http://127.0.0.1:${CATALOG_SERVICE_PORT:-8082}}"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-30}"
 QUEUE="catalog.inventory-stock-changed"
+DEAD_LETTER_QUEUE="catalog.inventory-stock-changed.dlq"
+EVENT_EXCHANGE="inventory.events"
+EVENT_ROUTING_KEY="inventory.stock.changed"
+RABBITMQ_MANAGEMENT_URL="${RABBITMQ_MANAGEMENT_URL:-http://127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}}"
+RABBITMQ_USER="${RABBITMQ_USER:-retail}"
+RABBITMQ_PASSWORD="${RABBITMQ_PASSWORD:-retail-demo}"
 DEMO="${DEMO:-0}"
 
 # Estado acumulado del escenario: 0 mientras todas las comprobaciones pasen.
@@ -15,6 +21,8 @@ E2E_STATUS=0
 SELL_STATUS=""
 SELL_BODY=""
 WAITED_MS=0
+# eventId del último evento inyectado con publish_event.
+LAST_EVENT_ID=""
 
 # Ejecuta docker compose desde la raíz del repositorio (el stack de desarrollo, proyecto por defecto).
 compose() { (cd "$E2E_ROOT" && docker compose "$@"); }
@@ -142,6 +150,59 @@ queue_messages() {
 
 # queue_is_empty <cola>: éxito si la cola no tiene mensajes (para wait_until).
 queue_is_empty() { [[ "$(queue_messages "$1")" == "0" ]]; }
+
+# queue_messages_is <cola> <cantidad> (para wait_until)
+queue_messages_is() { [[ "$(queue_messages "$1")" == "$2" ]]; }
+
+# --- Inyección de eventos en RabbitMQ (por la API de gestión) y logs del Catálogo ---
+
+# new_uuid: UUID aleatorio (Linux).
+new_uuid() { cat /proc/sys/kernel/random/uuid; }
+
+# version_base: base para las versiones de los eventos inyectados, a partir del reloj (milisegundos desde la
+# época). Crece siempre, así que supera cualquier versión ya aplicada y el escenario se puede repetir sin reset.
+version_base() { date +%s%3N; }
+
+# build_event <eventId> <sku> <stock> <versión> [canal]: JSON de un evento InventoryStockChanged válido,
+# con occurredAt = ahora (UTC, milisegundos).
+build_event() {
+  local occurred_at
+  occurred_at="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+  jq -cn --arg id "$1" --arg sku "$2" --argjson stock "$3" --argjson version "$4" \
+    --arg channel "${5:-POS}" --arg at "$occurred_at" \
+    '{eventId: $id, eventType: "InventoryStockChanged", sku: $sku, newStock: $stock,
+      stockVersion: $version, channel: $channel, occurredAt: $at}'
+}
+
+# management_publish_body <cuerpo>: cuerpo de la petición de publicación de la API de gestión de RabbitMQ.
+management_publish_body() {
+  jq -cn --arg payload "$1" --arg key "$EVENT_ROUTING_KEY" \
+    '{properties: {content_type: "application/json", delivery_mode: 2}, routing_key: $key,
+      payload: $payload, payload_encoding: "string"}'
+}
+
+# publish_raw <cuerpo>: publica el cuerpo tal cual en el exchange de eventos. Devuelve 0 solo si el broker
+# lo enruta a una cola (routed=true).
+publish_raw() {
+  local routed
+  show "PUBLISH $EVENT_EXCHANGE / $EVENT_ROUTING_KEY  $1"
+  routed="$(curl -s --max-time 10 -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" -H 'Content-Type: application/json' \
+    -X POST "$RABBITMQ_MANAGEMENT_URL/api/exchanges/%2F/$EVENT_EXCHANGE/publish" \
+    -d "$(management_publish_body "$1")" | jq -r '.routed')"
+  [[ "$routed" == "true" ]]
+}
+
+# publish_event <sku> <stock> <versión> [eventId] [canal]: publica un evento válido. Deja su eventId en
+# LAST_EVENT_ID (nuevo si no se indica). Devuelve 0 si el broker lo enruta.
+publish_event() {
+  LAST_EVENT_ID="${4:-$(new_uuid)}"
+  publish_raw "$(build_event "$LAST_EVENT_ID" "$1" "$2" "$3" "${5:-POS}")"
+}
+
+# catalog_log_count <patrón>: líneas del log del Catálogo que contienen el patrón (texto literal).
+catalog_log_count() { compose logs --no-color catalog-service 2>/dev/null | grep -c -F -- "$1"; }
+# catalog_log_count_is <patrón> <cantidad> (para wait_until)
+catalog_log_count_is() { [[ "$(catalog_log_count "$1")" == "$2" ]]; }
 
 # synced <sku>: éxito si el Catálogo muestra el mismo stock que Inventario; ambos deben ser enteros
 # (una consulta fallida deja vacío o null y no cuenta como coincidencia).
