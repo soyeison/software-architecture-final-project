@@ -65,7 +65,7 @@ com.retail.catalog
 ### Prueba de arquitectura (ArchUnit)
 
 1. No hay ciclos entre los paquetes de funcionalidad.
-2. Solo `StockEventListener` usa `org.springframework.amqp`.
+2. Solo `StockEventListener` (por nombre completo) usa `org.springframework.amqp` y `com.rabbitmq`.
 3. Los controladores no usan repositorios directamente: pasan por un caso de uso.
 4. `product/` no depende de `stockevent/`.
 
@@ -76,9 +76,9 @@ Las reglas 3 y 4 permiten evaluación vacía en 5.1 (no hay clases que evaluar) 
 ### Configuración
 
 - `CatalogProperties` (`@ConfigurationProperties`, validada) agrupa lo propio del servicio:
-  `catalog.consumer.queue` (por defecto `catalog.inventory-stock-changed`),
+  `catalog.consumer.queue` (su valor, `catalog.inventory-stock-changed`, vive en `application.yml`; sin él el servicio no arranca),
   `catalog.consumer.initial-backoff` (1 s) y `catalog.consumer.maximum-backoff` (30 s). Lo demás
-  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring. `CatalogProperties` llega en 5.4, con sus primeras propiedades reales; antes no habría nada que validar.
+  (`SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*`, `SERVER_PORT=8082`) lo enlaza Spring. `CatalogProperties` se valida al arrancar (cola no vacía, esperas positivas y tope no menor que la espera inicial) y sus valores viven en `application.yml`.
 - Los valores por defecto de `application.yml` apuntan a `localhost` (puertos 5442 y 5672), de modo
   que arrancar desde el IDE funciona sin configurar nada; Compose los sobrescribe con variables de
   entorno.
@@ -107,7 +107,7 @@ constructor. `updated_at` y la latencia usan este reloj.
 
 ### Salud
 
-El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`; la propiedad se configura en 5.4, al agregar AMQP): si el
+El indicador de salud de RabbitMQ se desactiva (`management.health.rabbit.enabled=false`): si el
 broker cae, el Catálogo sigue sirviendo consultas y el listener se reconecta solo. La salud de la base
 de datos permanece.
 
@@ -214,8 +214,16 @@ del `content_type`). Clasifica cada fallo según su causa:
 - **Límite conocido:** RabbitMQ cierra el canal si un mensaje permanece sin confirmar más de
   `consumer_timeout` (30 min por defecto); en una caída más larga el mensaje vuelve a la cola y se
   redelivera sin pérdida.
-- Los registros llevan `sku` y `eventId` en el MDC. `event_applied` incluye el stock previo y el nuevo
+- El **listener** maneja el MDC (`sku`, `eventId`) durante todo el procesamiento, reintentos incluidos;
+  `ApplyStockChangeService` no lo toca y sus mensajes repiten ambos valores. `event_applied` y
+  `event_stale` se registran **después de confirmar la transacción** (un cambio revertido nunca figura
+  como aplicado); `event_applied` incluye el stock previo y el nuevo
   (`previous=… new=… version=… latencyMs=…`), usando el valor guardado como "previo".
+- `acknowledge-mode: manual`, `concurrency: 1` y `prefetch: 1` están fijados en `application.yml` con un
+  comentario: la corrección de `ApplyStockChangeService` (no bloquea la fila de `Product`) y el orden por
+  producto dependen de ellos. Una carrera por el mismo `eventId` falla por la clave primaria con
+  `DataIntegrityViolationException`, que se trata como transitoria (el segundo intento responde
+  `DUPLICATE`).
 
 ### Notas heredadas de la fase 4 (para el consumidor)
 
@@ -310,9 +318,6 @@ verificado en Inventario.
 | Pendiente | Sub-tarea |
 |---|---|
 | `URI.create(requestPath)` en `GlobalExceptionHandler` y `ProblemType` de **Inventario** lanza si la ruta trae `[` o `]` (corregido en el Catálogo en la 5.2 con `ProblemType.toInstance`, que usa `UriComponentsBuilder.fromPath(...).build().encode()`; aplicar lo mismo en Inventario) | Cualquier cambio futuro en Inventario |
-| Endurecer la regla 2 de ArchUnit (`StockEventListener` por nombre simple) restringiéndola también al paquete `stockevent` | 5.4 |
-| La corrección de `ApplyStockChangeService` depende de `concurrency` 1 y `prefetch` 1 (no bloquea la fila de `Product`): fijarlos en la configuración con un comentario que lo explique, y tratar `DataIntegrityViolationException` (carrera de duplicados por `eventId`) como transitoria | 5.4 |
-| El MDC `sku`/`eventId` de `apply()` se borra al salir y el log `event_applied` se emite antes del commit: decidir en el listener quién maneja el MDC y cuándo se registra el log | 5.4 |
 | `ClockConfigurationTest` de Inventario usa la variable de bucle `i` en lugar de `index` | Cualquier cambio futuro en Inventario |
 
 ### Cierre de la fase 5
@@ -320,7 +325,8 @@ verificado en Inventario.
 `scripts/smoke-catalog-service.sh`, con todo en Compose: una venta en Inventario aparece en la
 consulta del Catálogo en pocos segundos con su `lastEventLatencyMs`, y el contenedor no corre como root.
 Es lo mínimo para dar la fase por terminada; los escenarios completos, la medición de latencia y los
-scripts E2E son de la fase 6.
+scripts E2E son de la fase 6. El script existe: `scripts/smoke-catalog-service.sh` (proyecto Compose y
+puertos propios).
 
 ## 8. Decisiones descartadas
 

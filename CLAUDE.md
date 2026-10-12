@@ -34,6 +34,7 @@ servicio), JWT, Docker Compose.
 - `scripts/verify-contracts.sh` verifica los contratos; `scripts/verify-infra.sh` verifica la
   infraestructura (ambos requieren Docker; `verify-infra.sh` también necesita curl y jq).
 - `scripts/smoke-inventory-service.sh` prueba de humo de Inventario dentro de Compose (requiere Docker, curl y jq).
+- `scripts/smoke-catalog-service.sh` prueba de humo del flujo venta → Catálogo dentro de Compose (requiere Docker, curl y jq).
 - Datos semilla de referencia: `docs/seed-data.md`.
 - `cd inventory-service && ./mvnw test` (unitarias y arquitectura) y `./mvnw verify` (además
   integración; requiere Docker). El servicio necesita `JWT_SECRET` de al menos 32 bytes para arrancar.

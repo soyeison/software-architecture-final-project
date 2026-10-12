@@ -1,5 +1,6 @@
 package com.retail.catalog.stockevent;
 
+import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,6 +20,14 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 public class StockEventReader {
+
+    /**
+     * Rango razonable de {@code occurredAt}. Jackson acepta instantes como {@code +300000000-01-01T00:00:00Z},
+     * que luego desbordan el cálculo de duración al aplicar el evento; al ser un fallo no clasificado se
+     * reintentaría para siempre y bloquearía la cola. Fuera de este rango el evento es inválido.
+     */
+    static final Instant EARLIEST_OCCURRED_AT = Instant.parse("2000-01-01T00:00:00Z");
+    static final Instant LATEST_OCCURRED_AT = Instant.parse("2100-01-01T00:00:00Z");
 
     private final JsonMapper jsonMapper;
     private final Validator validator;
@@ -54,6 +63,10 @@ public class StockEventReader {
                     .sorted()
                     .collect(Collectors.joining("; "));
             throw new InvalidEventException("The event has invalid fields: " + details);
+        }
+        if (event.occurredAt().isBefore(EARLIEST_OCCURRED_AT) || event.occurredAt().isAfter(LATEST_OCCURRED_AT)) {
+            throw new InvalidEventException("The event has invalid fields: occurredAt must be between "
+                    + EARLIEST_OCCURRED_AT + " and " + LATEST_OCCURRED_AT);
         }
         return event;
     }

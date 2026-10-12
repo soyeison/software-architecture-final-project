@@ -3,6 +3,7 @@ package com.retail.catalog.stockevent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -11,11 +12,17 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
+import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -29,6 +36,7 @@ import com.retail.catalog.support.PostgresIntegrationTest;
  * {@code processed_events}: la semilla de {@code products} debe quedar intacta para otras clases.
  */
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
 class ApplyStockChangeServiceIntegrationTest extends PostgresIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-10-12T12:00:00.500Z");
@@ -42,6 +50,9 @@ class ApplyStockChangeServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @MockitoBean
     private Clock clock;
@@ -161,5 +172,38 @@ class ApplyStockChangeServiceIntegrationTest extends PostgresIntegrationTest {
 
         assertThat(result).isEqualTo(ApplyResult.APPLIED);
         assertThat(stored().getAvailableStock()).isZero();
+    }
+
+    @Test
+    void theAppliedEventIsLoggedWithPreviousAndNewStockAndItsLatency(CapturedOutput output) {
+        UUID eventId = UUID.randomUUID();
+
+        service.apply(event(eventId, 3, 2));
+
+        assertThat(output).contains("event_applied sku=" + sku + " eventId=" + eventId
+                + " previous=5 new=3 version=2 latencyMs=400");
+    }
+
+    /**
+     * Carrera por el mismo eventId: otro consumidor lo registra justo antes de que esta transacción confirme. El
+     * INSERT falla en el commit con la clave primaria; como el registro se emite después de confirmar, no queda un
+     * "aplicado" en el log, y el stock no cambia.
+     */
+    @Test
+    void aDuplicateKeyRaceFailsAtCommitAndIsNeverLoggedAsApplied(CapturedOutput output) {
+        UUID eventId = UUID.randomUUID();
+        doAnswer(invocation -> {
+            jdbcTemplate.update("INSERT INTO processed_events (event_id, processed_at) VALUES (?, now())", eventId);
+            // Equivale al save real de una entidad nueva: persist en la transacción del servicio (INSERT al confirmar).
+            Object entity = invocation.getArgument(0);
+            entityManager.persist(entity);
+            return entity;
+        }).when(processedEventRepository).save(any());
+
+        assertThatThrownBy(() -> service.apply(event(eventId, 3, 2)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(output).doesNotContain("event_applied sku=" + sku);
+        assertThat(stored().getAvailableStock()).isEqualTo(5);
     }
 }

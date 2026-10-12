@@ -22,8 +22,8 @@ class ArchitectureTest {
 
     @ArchTest
     static final ArchRule onlyStockEventListenerUsesAmqp = noClasses()
-            .that().doNotHaveSimpleName("StockEventListener")
-            .should().dependOnClassesThat().resideInAPackage("org.springframework.amqp..");
+            .that().doNotHaveFullyQualifiedName("com.retail.catalog.stockevent.StockEventListener")
+            .should().dependOnClassesThat().resideInAnyPackage("org.springframework.amqp..", "com.rabbitmq..");
 
     @ArchTest
     static final ArchRule controllersDoNotUseRepositories = noClasses()

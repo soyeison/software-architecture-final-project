@@ -118,8 +118,33 @@ class StockEventReaderTest {
                 .hasMessageContaining("sku");
     }
 
+    /** Instantes válidos para Jackson pero absurdos: harían fallar el cálculo de antigüedad del producto. */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "+300000000-01-01T00:00:00Z",
+            "-300000000-01-01T00:00:00Z",
+            "1999-12-31T23:59:59Z",
+            "2100-01-01T00:00:01Z"
+    })
+    void rejectsAnOccurredAtOutsideTheReasonableRange(String occurredAt) {
+        assertThatThrownBy(() -> reader.read(json(withOccurredAt(occurredAt))))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("occurredAt");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "2000-01-01T00:00:00Z", "2026-10-10T15:04:05.123Z", "2100-01-01T00:00:00Z" })
+    void acceptsAnOccurredAtWithinTheReasonableRange(String occurredAt) {
+        assertThat(reader.read(json(withOccurredAt(occurredAt))).occurredAt()).isEqualTo(Instant.parse(occurredAt));
+    }
+
+    private static String withOccurredAt(String occurredAt) {
+        return "{\"eventId\":\"7f3c9a2e-5b1d-4c8e-9f0a-2d6b8e1c4a73\",\"sku\":\"A\",\"newStock\":1,"
+                + "\"stockVersion\":1,\"occurredAt\":\"" + occurredAt + "\"}";
+    }
+
     @Test
-    void theErrorMessageNamesTheOffendingFields() throws IOException {
+    void theErrorMessageNamesTheOffendingFields()throws IOException {
         byte[] body = example("invalid-negative-stock.json");
 
         assertThatThrownBy(() -> reader.read(body))
