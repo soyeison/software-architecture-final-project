@@ -129,6 +129,112 @@ expect "publish_event: con valores válidos publica un cuerpo JSON y devuelve 0"
 failing_publish_code="$(publish_raw() { return 1; }; publish_event X 1 2 >/dev/null; echo "$?")"
 expect "publish_event: propaga el código de salida de publish_raw" "$failing_publish_code" "1"
 
+# --- Caídas de servicios y métricas (sin Docker: compose, curl y wait_until simulados) ---
+first_now="$(now_ms)"
+expect "now_ms: milisegundos desde la época (13 dígitos)" \
+  "$([[ "$first_now" =~ ^[0-9]{13}$ ]] && echo yes || echo no)" "yes"
+expect "metric: formato fijo para run-all.sh" "$(metric catalog_catch_up_ms 1234)" "METRIC catalog_catch_up_ms=1234"
+
+calls_file="$(mktemp)"
+registry_state() { # registry_state <comando...>: ejecuta con un compose simulado y muestra el registro y las llamadas
+  ( compose() { echo "$*" >>"$calls_file"; return "${COMPOSE_STATUS:-0}"; }
+    STOPPED_SERVICES=()
+    "$@"
+    echo "registro=[${STOPPED_SERVICES[*]}]" )
+}
+two_stops_one_start() { stop_service catalog-service; stop_service rabbitmq; start_service catalog-service; }
+: >"$calls_file"
+expect "stop_service y start_service: solo queda registrado el que sigue detenido" \
+  "$(registry_state two_stops_one_start)" "registro=[rabbitmq]"
+expect "stop_service: llama a docker compose stop" \
+  "$(grep -c '^stop catalog-service$' "$calls_file")" "1"
+expect "start_service: espera a que esté sano y no recrea el contenedor" \
+  "$(grep -c '^up -d --wait --wait-timeout 120 --no-recreate catalog-service$' "$calls_file")" "1"
+
+restore_all() { stop_service catalog-service; stop_service rabbitmq; restore_services 2>/dev/null; }
+: >"$calls_file"
+expect "restore_services: levanta todo lo que quedó detenido y vacía el registro" \
+  "$(registry_state restore_all)" "registro=[]"
+expect "restore_services: levantó catalog-service" \
+  "$(grep -c '^up .* catalog-service$' "$calls_file")" "1"
+expect "restore_services: levantó rabbitmq" "$(grep -c '^up .* rabbitmq$' "$calls_file")" "1"
+
+failing_stop() { COMPOSE_STATUS=1 stop_service rabbitmq; echo "estado=$?"; }
+expect "stop_service: si compose falla devuelve 1 y deja registrado el servicio" \
+  "$(registry_state failing_stop | paste -sd' ')" "estado=1 registro=[rabbitmq]"
+twice_stop() { stop_service rabbitmq; stop_service rabbitmq; }
+expect "stop_service: detener dos veces el mismo servicio no lo registra duplicado" \
+  "$(registry_state twice_stop)" "registro=[rabbitmq]"
+failing_start() { stop_service rabbitmq; COMPOSE_STATUS=1 start_service rabbitmq; echo "estado=$?"; }
+expect "start_service: si compose falla devuelve 1 y conserva el registro" \
+  "$(registry_state failing_start | paste -sd' ')" "estado=1 registro=[rabbitmq]"
+rm -f "$calls_file"
+
+# restore_services debe avisar por el stderr original aunque se ejecute dentro de `>/dev/null 2>&1`
+# (como pasa cuando la señal llega durante un predicado de wait_until).
+restore_messages_file="$(mktemp)"
+restore_under_redirect() { # restore_under_redirect <estado de compose>
+  ( compose() { return "$1"; }
+    STOPPED_SERVICES=(rabbitmq)
+    install_restore_trap 2>"$restore_messages_file"
+    trap - EXIT INT TERM
+    restore_services >/dev/null 2>&1
+    echo "registro=[${STOPPED_SERVICES[*]}]" ) 2>>"$restore_messages_file"
+}
+: >"$restore_messages_file"
+restore_under_redirect 0 >/dev/null
+expect "restore_services: el aviso 'Restaurando' llega al stderr original aunque esté redirigido" \
+  "$(grep -c '^Restaurando rabbitmq' "$restore_messages_file")" "1"
+: >"$restore_messages_file"
+expect "restore_services: si compose falla conserva el registro" "$(restore_under_redirect 1)" "registro=[rabbitmq]"
+expect "restore_services: el aviso FAIL llega al stderr original" \
+  "$(grep -c '^FAIL: no se pudo restaurar rabbitmq' "$restore_messages_file")" "1"
+rm -f "$restore_messages_file"
+
+queue_consumers_with() { # queue_consumers_with <consumidores> <comando...>: simula rabbitmqctl list_queues name consumers
+  ( simulated_consumers="$1"
+    compose() { printf 'catalog.inventory-stock-changed\t%s\r\nother.queue\t5\n' "$simulated_consumers"; }
+    "${@:2}" )
+}
+expect "queue_consumers: lee la columna de consumidores de la cola" "$(queue_consumers_with 1 queue_consumers catalog.inventory-stock-changed)" "1"
+expect "queue_consumers_is: cero consumidores" \
+  "$(queue_consumers_with 0 queue_consumers_is catalog.inventory-stock-changed 0 && echo yes || echo no)" "yes"
+expect "queue_consumers_is: distinto" \
+  "$(queue_consumers_with 1 queue_consumers_is catalog.inventory-stock-changed 0 && echo yes || echo no)" "no"
+
+outbox_sample='[{"eventId":"a","status":"PENDING"},{"eventId":"b","status":"PENDING"},{"eventId":"z","status":"PENDING"}]'
+outbox_count_for() { ( curl() { echo "$outbox_sample"; }; outbox_count_with_status "$@" ); }
+expect "outbox_count_with_status: cuenta solo los eventId indicados" "$(outbox_count_for PENDING a b c)" "2"
+expect "outbox_count_with_status: ninguno coincide" "$(outbox_count_for PENDING x y)" "0"
+outbox_is_for() { ( curl() { echo "$outbox_sample"; }; outbox_count_with_status_is "$@" && echo yes || echo no ); }
+expect "outbox_count_with_status_is: coincide" "$(outbox_is_for PENDING 2 a b c)" "yes"
+expect "outbox_count_with_status_is: no coincide" "$(outbox_is_for PENDING 3 a b c)" "no"
+expect "outbox_count_with_status: respuesta que no es JSON no cuenta nada" \
+  "$( ( curl() { echo 'caído'; }; outbox_count_with_status PENDING a 2>/dev/null ) )" ""
+expect "outbox_count_with_status_is: respuesta que no es JSON es falso" \
+  "$( ( curl() { echo 'caído'; }; outbox_count_with_status_is PENDING 0 a 2>/dev/null && echo yes || echo no ) )" "no"
+
+log_sample='2026-10-12 INFO [sku=MOCHILA] [eventId=aaa] c.r.c.s.ApplyStockChangeService : event_applied sku=MOCHILA eventId=aaa previous=10 new=9 version=2 latencyMs=5
+2026-10-12 INFO [sku=OTRO] [eventId=zzz] c.r.c.s.ApplyStockChangeService : event_applied sku=OTRO eventId=zzz previous=3 new=2 version=2 latencyMs=5
+2026-10-12 INFO [sku=MOCHILA] [eventId=ccc] c.r.c.s.ApplyStockChangeService : event_applied sku=MOCHILA eventId=ccc previous=9 new=8 version=3 latencyMs=5
+2026-10-12 INFO [sku=MOCHILA] [eventId=bbb] c.r.c.s.ApplyStockChangeService : event_duplicate sku=MOCHILA eventId=bbb
+2026-10-12 INFO [sku=MOCHILA] [eventId=bbb] c.r.c.s.ApplyStockChangeService : event_applied sku=MOCHILA eventId=bbb previous=8 new=7 version=4 latencyMs=5'
+applied_for() { ( compose() { echo "$log_sample"; }; catalog_applied_sequence "$@" | paste -sd' ' ); }
+expect "catalog_applied_sequence: devuelve los eventId pedidos en el orden del log, una vez cada uno" \
+  "$(applied_for MOCHILA bbb ccc aaa)" "aaa ccc bbb"
+expect "catalog_applied_sequence: ignora otros SKU y eventId no pedidos" "$(applied_for MOCHILA aaa)" "aaa"
+expect "catalog_applied_sequence: un evento que no se aplicó no aparece" "$(applied_for MOCHILA nunca)" ""
+unreadable_applied() { ( compose() { return 1; }; catalog_applied_sequence MOCHILA aaa; echo "estado=$?" ); }
+expect "catalog_applied_sequence: devuelve 1 sin imprimir si no puede leer el log" "$(unreadable_applied)" "estado=1"
+
+# El tiempo máximo de espera se puede cambiar por llamada y vuelve a su valor después.
+WAIT_TIMEOUT_SECONDS=2
+WAIT_TIMEOUT_SECONDS=1 wait_until "condición imposible con espera corta" false >/dev/null
+expect "wait_until: el tiempo máximo por llamada se respeta (1 s)" \
+  "$([[ $WAITED_MS -ge 1000 && $WAITED_MS -lt 1800 ]] && echo yes || echo no)" "yes"
+expect "wait_until: el tiempo máximo por llamada no altera el global" "$WAIT_TIMEOUT_SECONDS" "2"
+E2E_STATUS=0
+
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
   exit 1

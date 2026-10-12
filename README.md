@@ -180,13 +180,17 @@ e2e/reset.sh                  # DESTRUCTIVO: down -v + up --build, estado inicia
 ```
 
 Por ahora están los escenarios 01 (venta POS), 02 (venta online), 03 (carrera por la última unidad), 04
-(venta sin stock), 06 (mensaje duplicado), 07 (mensaje inválido), 09 (eventos fuera de orden) y 10
-(seguridad). Cada uno usa su SKU de `docs/seed-data.md` y compara contra el estado actual. El 03 necesita
+(venta sin stock), 05 (Catálogo caído), 06 (mensaje duplicado), 07 (mensaje inválido), 08 (RabbitMQ caído),
+09 (eventos fuera de orden) y 10 (seguridad). Cada uno usa su SKU de `docs/seed-data.md` y compara contra el estado actual. El 03 necesita
 stock exactamente 1 y solo corre una vez por reinicio; el 01 y el 02 consumen una unidad de
 TENIS-RUNNER-42 (stock sembrado 5), y el 07 consume otra, así que tras unas 5 ventas hace falta
 `e2e/reset.sh`; el 04, el 06, el 09 y el 10 se repiten sin límite. El 06 y el 09 inyectan eventos en
 RabbitMQ con `CALCETINES-PACK-3` (su estado en el Catálogo diverge del de Inventario por diseño), y el 07
-deja 3 mensajes más en la cola de mensajes rechazados (DLQ) en cada ejecución.
+deja 3 mensajes más en la cola de mensajes rechazados (DLQ) en cada ejecución. El 05 y el 08 detienen un
+contenedor (Catálogo y RabbitMQ) y lo restauran al terminar, incluso si se interrumpen con Ctrl+C o SIGTERM;
+el 05 consume 3 unidades de MOCHILA-TRAIL-20L (3 ejecuciones por reinicio) y el 08 consume 2 de
+BOTELLA-TERMICA-750 (5 ejecuciones). Ambos imprimen métricas `METRIC …` (puesta al día del Catálogo, vaciado
+del outbox y recuperación tras volver RabbitMQ).
 Variables opcionales: `INVENTORY_URL`, `CATALOG_URL`, `WAIT_TIMEOUT_SECONDS`, `RABBITMQ_MANAGEMENT_URL`,
 `RABBITMQ_USER` y `RABBITMQ_PASSWORD`.
 
