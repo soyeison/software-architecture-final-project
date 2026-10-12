@@ -83,9 +83,47 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void unsupportedMethodKeepsItsHttpStatus() throws Exception {
-        mockMvc.perform(delete("/probe/echo"))
+    void unsupportedMethodKeepsItsHttpStatusAndHasTheGenericType() throws Exception {
+        String body = mockMvc.perform(delete("/probe/echo"))
                 .andExpect(status().isMethodNotAllowed())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "http-error"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "Problem");
+    }
+
+    @Test
+    void missingRequiredParameterReturnsValidationProblemListingIt() throws Exception {
+        String body = mockMvc.perform(get("/probe/page"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "validation-error"))
+                .andExpect(jsonPath("$.errors[0].field").value("number"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "ValidationProblem");
+    }
+
+    @Test
+    void parameterOfTheWrongTypeReturnsValidationProblemListingIt() throws Exception {
+        String body = mockMvc.perform(get("/probe/page").param("number", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "validation-error"))
+                .andExpect(jsonPath("$.errors[0].field").value("number"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "ValidationProblem");
+    }
+
+    @Test
+    void parameterViolatingAConstraintReturnsValidationProblemListingIt() throws Exception {
+        String body = mockMvc.perform(get("/probe/limit").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PROBLEM_TYPE_BASE + "validation-error"))
+                .andExpect(jsonPath("$.errors[0].field").value("size"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertMatchesSchema(body, "ValidationProblem");
     }
 }
