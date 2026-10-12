@@ -299,6 +299,13 @@ expect "11-latency.sh: el mensaje nombra la variable" \
   "$(LATENCY_SALES=abc "$e2e_dir/11-latency.sh" 2>&1 | grep -c 'LATENCY_SALES')" "1"
 LATENCY_P95_LIMIT_MS=0 "$e2e_dir/11-latency.sh" >/dev/null 2>&1
 expect "11-latency.sh: LATENCY_P95_LIMIT_MS inválido falla (código 1)" "$?" "1"
+expect "11-latency.sh: el mensaje nombra LATENCY_P95_LIMIT_MS" \
+  "$(LATENCY_P95_LIMIT_MS=0 "$e2e_dir/11-latency.sh" 2>&1 | grep -c 'LATENCY_P95_LIMIT_MS')" "1"
+# Distingue la validación del fallo de require_stack (sin Docker también termina con 1 y dice "no responde")
+expect "11-latency.sh: LATENCY_SALES inválido no llega a require_stack" \
+  "$(LATENCY_SALES=abc "$e2e_dir/11-latency.sh" 2>&1 | grep -c 'no responde')" "0"
+expect "11-latency.sh: LATENCY_P95_LIMIT_MS inválido no llega a require_stack" \
+  "$(LATENCY_P95_LIMIT_MS=0 "$e2e_dir/11-latency.sh" 2>&1 | grep -c 'no responde')" "0"
 
 if (( failures > 0 )); then
   echo "Autoprueba FALLÓ ($failures)"
